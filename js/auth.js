@@ -1,17 +1,35 @@
-/* Sessão: leitor (livre) e administrador (senha verificada por hash SHA-256) */
+/* Sessão: leitor (livre) e administrador (autenticado no Supabase) */
 const Auth = (() => {
-  const HASH = 'ade8ca778d2f509556886ba0aa203fb70d9f78748db5cf116b2500f2ef0cad4d', KEY = 'acervo_session';
-  const sha = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))]
-    .map(b => b.toString(16).padStart(2, '0')).join('');
+  const KEY = 'acervo_session';
+  const C = () => window.CONFIG;
   const session = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
+  const save = o => localStorage.setItem(KEY, JSON.stringify(o));
+  const logout = () => { localStorage.removeItem(KEY); location.replace('login.html'); };
+  const grant = (type, body) => fetch(`${C().SUPABASE_URL}/auth/v1/token?grant_type=${type}`, {
+    method: 'POST', headers: { apikey: C().SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+
   async function loginAdmin(pw) {
-    if (await sha(pw) !== HASH) return false;
-    localStorage.setItem(KEY, JSON.stringify({ role: 'admin', name: 'Pedro Henrique' }));
+    const r = await grant('password', { email: C().ADMIN_EMAIL, password: pw });
+    if (r.status === 400 || r.status === 401) return false;   // senha incorreta
+    if (!r.ok) throw new Error('auth');
+    const d = await r.json();
+    save({ role: 'admin', name: 'Pedro Henrique', token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
     return true;
   }
   function loginReader(name) {
-    localStorage.setItem(KEY, JSON.stringify({ role: 'reader', name: (name || '').trim().slice(0, 30) || 'Visitante' }));
+    save({ role: 'reader', name: (name || '').trim().slice(0, 30) || 'Visitante' });
   }
-  const logout = () => { localStorage.removeItem(KEY); location.replace('login.html'); };
-  return { session, loginAdmin, loginReader, logout };
+  // token válido do administrador (renova sozinho quando expira)
+  async function token() {
+    const s = session();
+    if (!s || s.role !== 'admin' || !s.token) return null;
+    if (Date.now() < s.exp - 60000) return s.token;
+    const r = await grant('refresh_token', { refresh_token: s.refresh });
+    if (!r.ok) { logout(); throw new Error('expired'); }
+    const d = await r.json();
+    save({ ...s, token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
+    return d.access_token;
+  }
+  return { session, loginAdmin, loginReader, logout, token };
 })();

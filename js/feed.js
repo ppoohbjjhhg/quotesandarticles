@@ -2,19 +2,16 @@
   const S = Auth.session();
   if (!S) { location.replace('login.html'); return; }
   const admin = S.role === 'admin';
+  if (admin && !S.token) { Auth.logout(); return; }   // sessão antiga, sem acesso ao banco
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const CATS = { quote: 'Quote', nota: 'Nota', estudo: 'Estudo', artigo: 'Artigo' };
   const NAV = [['all', 'home', 'Início'], ['quote', 'quote', 'Quotes'], ['nota', 'note', 'Notas'], ['estudo', 'book', 'Estudos'], ['artigo', 'file', 'Artigos']];
   const AUTHOR = { name: 'Pedro Henrique', handle: '@henrique' };
-  const KP = 'acervo_posts', KS = 'acervo_saved';
+  const KS = 'acervo_saved';
 
   let posts = [], tab = 'all', cat = 'all', q = '', newCat = 'nota', newImg = null;
   let saved = []; try { saved = JSON.parse(localStorage.getItem(KS)) || []; } catch {}
-
-  const load = () => { try { const l = localStorage.getItem(KP); if (l) return JSON.parse(l); } catch {} return [...(window.POSTS_DATA || [])]; };
-  const persist = () => { try { localStorage.setItem(KP, JSON.stringify(posts)); return true; } catch { UI.toast('Sem espaço no navegador. Use uma imagem menor.'); return false; } };
-  posts = load();
 
   // estrutura fixa
   $('#links').innerHTML = NAV.map(([k, i, l]) => `<button class="nav-link${k === 'all' ? ' on' : ''}" data-cat="${k}">${UI.icon(i)}<span>${l}</span></button>`).join('');
@@ -47,7 +44,7 @@
     el.innerHTML = `
       <div class="avatar">${esc(AUTHOR.name[0])}</div>
       <div class="p-body">
-        <div class="p-top"><b>${esc(AUTHOR.name)}</b><span>${AUTHOR.handle} · ${fmt(p.date)}</span><span class="tag">${CATS[p.cat] || ''}</span></div>
+        <div class="p-top"><b>${esc(AUTHOR.name)}</b><span>${AUTHOR.handle} · ${fmt(p.created_at)}</span><span class="tag">${CATS[p.cat] || ''}</span></div>
         ${p.title ? `<h2 class="p-title">${esc(p.title)}</h2>` : ''}
         ${p.text ? `<p class="p-text">${esc(p.text)}</p>` : ''}
         ${p.img ? `<img class="p-img" src="${esc(p.img)}" alt="" loading="lazy">` : ''}
@@ -63,17 +60,17 @@
   function render() {
     const list = posts
       .filter(p => (cat === 'all' || p.cat === cat) && (tab === 'all' || (tab === 'img' ? p.img : !p.img)) && (!q || `${p.title} ${p.text}`.toLowerCase().includes(q)))
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const feed = $('#feed'); feed.innerHTML = '';
     if (!list.length) { feed.innerHTML = '<p class="empty">Nada por aqui ainda.</p>'; return; }
     const wrap = document.createDocumentFragment();
-    list.forEach(p => { const c = card(p); wrap.append(c); });
+    list.forEach(p => wrap.append(card(p)));
     feed.append(wrap);
     feed.querySelectorAll('.post').forEach((c, i) => { c.style.transitionDelay = `${Math.min(i, 4) * 40}ms`; UI.reveal(c); });
     feed.style.display = 'grid'; feed.style.gap = '1rem';
   }
 
-  $('#feed').addEventListener('click', e => {
+  $('#feed').addEventListener('click', async e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const id = b.closest('.post').dataset.id, p = posts.find(x => x.id === id);
     if (b.dataset.act === 'save') {
@@ -81,14 +78,15 @@
       localStorage.setItem(KS, JSON.stringify(saved)); b.classList.toggle('on');
     } else if (b.dataset.act === 'copy') {
       navigator.clipboard?.writeText(`${p.title ? p.title + '\n' : ''}${p.text}`).then(() => UI.toast('Copiado'));
-    } else if (b.dataset.act === 'del' && confirm('Excluir esta publicação?')) {
-      posts = posts.filter(x => x.id !== id); persist(); render(); UI.toast('Excluído');
+    } else if (b.dataset.act === 'del' && confirm('Excluir esta publicação para todos?')) {
+      try { await DB.remove(p); posts = posts.filter(x => x.id !== id); render(); UI.toast('Excluído'); }
+      catch { UI.toast('Não foi possível excluir. Entre de novo como administrador.'); }
     }
   });
 
   // administrador
   if (admin) {
-    $('#composer').hidden = false; $('#tools').hidden = false;
+    $('#composer').hidden = false;
     $('#cAv').textContent = AUTHOR.name[0];
     $('#attach').innerHTML = UI.icon('image'); $('#prevX').innerHTML = UI.icon('x', 16);
     $('#cats').innerHTML = Object.entries(CATS).map(([k, l]) => `<button type="button" class="chip${k === newCat ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
@@ -107,20 +105,16 @@
       newImg = await shrink(f); $('#prev img').src = newImg; $('#prev').hidden = false; sync();
     });
     $('#prevX').onclick = () => { newImg = null; $('#cfile').value = ''; $('#prev').hidden = true; sync(); };
-    $('#publish').onclick = () => {
-      posts.unshift({ id: 'p' + Date.now(), cat: newCat, title: $('#ctitle').hidden ? '' : $('#ctitle').value.trim(), text: $('#ctext').value.trim(), img: newImg, date: new Date().toISOString() });
-      if (!persist()) { posts.shift(); return; }
-      $('#ctext').value = ''; $('#ctitle').value = ''; $('#prevX').click();
-      render(); UI.toast('Publicado');
-    };
-    $('#export').onclick = () => {
-      const blob = new Blob([`/* Gerado em ${new Date().toLocaleString('pt-BR')} */\nwindow.POSTS_DATA = ${JSON.stringify(posts, null, 2)};\n`], { type: 'text/javascript' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'posts-data.js'; a.click();
-      UI.toast('Substitua js/posts-data.js por este arquivo');
-    };
-    $('#reset').onclick = () => {
-      if (!confirm('Descartar o que foi feito neste navegador e voltar ao posts-data.js?')) return;
-      localStorage.removeItem(KP); posts = [...(window.POSTS_DATA || [])]; render(); UI.toast('Restaurado');
+    $('#publish').onclick = async () => {
+      const btn = $('#publish'); btn.disabled = true; btn.textContent = 'Publicando…';
+      try {
+        const img = newImg ? await DB.upload(newImg) : null;
+        const p = await DB.add({ cat: newCat, title: $('#ctitle').hidden ? '' : $('#ctitle').value.trim(), text: $('#ctext').value.trim(), img });
+        posts.unshift(p);
+        $('#ctext').value = ''; $('#ctitle').value = ''; $('#prevX').click();
+        render(); UI.toast('Publicado para todos');
+      } catch { UI.toast('Erro ao publicar. Entre de novo como administrador.'); }
+      finally { btn.textContent = 'Publicar'; sync(); }
     };
     sync();
   }
@@ -138,5 +132,9 @@
     });
   }
 
-  render();
+  (async () => {
+    $('#feed').innerHTML = '<p class="empty">Carregando…</p>';
+    try { posts = await DB.list(); render(); }
+    catch { $('#feed').innerHTML = '<p class="empty">Não foi possível carregar as publicações.</p>'; }
+  })();
 })();

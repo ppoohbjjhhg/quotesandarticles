@@ -24,7 +24,7 @@ forms[1].addEventListener('submit', async e => {
   err.textContent = '';
   let ok = false;
   try { ok = await Auth.loginAdmin(document.getElementById('pw').value); }
-  catch { err.textContent = 'Abra o site por HTTPS ou localhost para validar a senha.'; return; }
+  catch { err.textContent = 'Não foi possível conectar. Confira o js/config.js e a internet.'; return; }
   if (ok) return go();
   err.textContent = 'Senha incorreta.';
   card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
