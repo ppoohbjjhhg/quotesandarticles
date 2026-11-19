@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acervo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Newsreader:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="orb a"></div><div class="orb b"></div>
+<div class="shell">
+  <nav class="side glass" aria-label="Seções">
+    <div class="brand"><span class="mark sm" aria-hidden="true">“</span><strong>Acervo</strong></div>
+    <div class="links" id="links"></div>
+    <div class="me">
+      <div class="avatar" id="meAv"></div>
+      <div class="me-t"><b id="meName"></b><small id="meRole"></small></div>
+      <button class="icon-btn" id="logout" title="Sair" aria-label="Sair"></button>
+    </div>
+  </nav>
+
+  <main class="col">
+    <header class="col-head glass">
+      <h1 id="title">Início</h1>
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-tab="all">Posts</button>
+        <button class="tab" data-tab="img">Imagens</button>
+        <button class="tab" data-tab="txt">Texto</button>
+      </div>
+    </header>
+
+    <section class="composer glass" id="composer" hidden>
+      <div class="avatar" id="cAv"></div>
+      <div class="c-body">
+        <div class="chips" id="cats"></div>
+        <input class="plain" id="ctitle" maxlength="90" placeholder="Título" hidden>
+        <textarea class="plain" id="ctext" rows="3" placeholder="O que você quer registrar?"></textarea>
+        <div class="preview" id="prev" hidden><img alt="Pré-visualização"><button class="icon-btn" id="prevX" aria-label="Remover imagem"></button></div>
+        <div class="c-row">
+          <label class="icon-btn" for="cfile" title="Adicionar imagem" id="attach"></label>
+          <input id="cfile" type="file" accept="image/*" hidden>
+          <button class="btn btn-primary" id="publish" disabled>Publicar</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="feed"></div>
+  </main>
+
+  <aside class="rail">
+    <label class="search glass"><span id="sIcon"></span><input id="search" placeholder="Buscar no acervo" aria-label="Buscar"></label>
+    <section class="glass card-s">
+      <h3>Sobre</h3>
+      <p>Um acervo pessoal de quotes, notas, estudos e artigos. Edite este texto em <code>html/feed.html</code>.</p>
+    </section>
+    <section class="glass card-s" id="tools" hidden>
+      <h3>Publicação</h3>
+      <p>As postagens ficam salvas neste navegador. Para o público ver, exporte e substitua <code>js/posts-data.js</code>.</p>
+      <div class="stack">
+        <button class="btn btn-primary" id="export">Exportar posts-data.js</button>
+        <button class="btn btn-ghost" id="reset">Descartar alterações locais</button>
+      </div>
+    </section>
+  </aside>
+</div>
+<script src="../js/ui.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/posts-data.js"></script>
+<script src="../js/feed.js"></script>
+</body>
+</html>
