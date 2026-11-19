@@ -131,3 +131,5 @@ input.plain{font-weight:700;font-size:1.05rem}
   .col-head{top:.6rem}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}html{scroll-behavior:auto}}
+
+.credit{margin-top:1.8rem;font-size:.72rem;letter-spacing:.03em;color:var(--muted);opacity:.65}
