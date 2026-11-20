@@ -140,9 +140,9 @@ label.btn{display:block;text-align:center}
 /* identidade visual por categoria */
 .post{--acc:#2D6CDF;position:relative}
 .post[data-cat="quote"]{--acc:#2D6CDF}
-.post[data-cat="nota"]{--acc:#D98E04}
-.post[data-cat="estudo"]{--acc:#0E9F8E}
-.post[data-cat="artigo"]{--acc:#7C4DFF}
+.post[data-cat="nota"]{--acc:#005219}
+.post[data-cat="estudo"]{--acc:#3b039a}
+.post[data-cat="artigo"]{--acc:#cddf03}
 .post::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:4px;border-radius:0 4px 4px 0;background:var(--acc)}
 .post .p-top .tag{display:inline-flex;align-items:center;gap:.3rem;color:var(--acc-t,var(--acc));background:color-mix(in srgb,var(--acc) 15%,transparent)}
 .post[data-cat="quote"] .p-text{border-left-color:var(--acc)}
