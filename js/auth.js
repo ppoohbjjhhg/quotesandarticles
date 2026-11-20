@@ -20,6 +20,7 @@ const Auth = (() => {
   function loginReader(name) {
     save({ role: 'reader', name: (name || '').trim().slice(0, 30) || 'Visitante' });
   }
+  function rename(n) { const s = session(); if (s) { s.name = n; save(s); } }
   // token válido do administrador (renova sozinho quando expira)
   async function token() {
     const s = session();
@@ -31,5 +32,5 @@ const Auth = (() => {
     save({ ...s, token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
     return d.access_token;
   }
-  return { session, loginAdmin, loginReader, logout, token };
+  return { session, loginAdmin, loginReader, logout, token, rename };
 })();

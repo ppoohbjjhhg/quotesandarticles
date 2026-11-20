@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Acervo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Newsreader:ital,wght@1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Newsreader:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;600&family=Caveat:wght@500;700&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -34,13 +34,23 @@
     <section class="composer glass" id="composer" hidden>
       <div class="avatar" id="cAv"></div>
       <div class="c-body">
+        <div class="edit-flag" id="editFlag" hidden>Editando publicação <button type="button" class="link" id="cancelEdit">cancelar</button></div>
         <div class="chips" id="cats"></div>
-        <input class="plain" id="ctitle" maxlength="90" placeholder="Título" hidden>
-        <textarea class="plain" id="ctext" rows="3" placeholder="O que você quer registrar?"></textarea>
-        <div class="preview" id="prev" hidden><img alt="Pré-visualização"><button class="icon-btn" id="prevX" aria-label="Remover imagem"></button></div>
+        <div class="draft" id="draft">
+          <input class="plain" id="ctitle" maxlength="90" placeholder="Título" hidden>
+          <textarea class="plain" id="ctext" rows="3" placeholder="O que você quer registrar?"></textarea>
+        </div>
+        <div class="thumbs" id="thumbs" hidden></div>
+        <div class="styler">
+          <label class="sel">Fonte <select id="cfont"></select></label>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Cor do post"></div>
+        </div>
         <div class="c-row">
-          <label class="icon-btn" for="cfile" title="Adicionar imagem" id="attach"></label>
-          <input id="cfile" type="file" accept="image/*" hidden>
+          <div class="c-tools">
+            <label class="icon-btn" for="cfile" id="attach" title="Adicionar fotos (até 5)"></label>
+            <span class="count" id="imgCount"></span>
+          </div>
+          <input id="cfile" type="file" accept="image/*" multiple hidden>
           <button class="btn btn-primary" id="publish" disabled>Publicar</button>
         </div>
       </div>
@@ -54,6 +64,14 @@
     <section class="glass card-s">
       <h3>Sobre</h3>
       <p>Um acervo pessoal de quotes, notas, estudos e artigos. Edite este texto em <code>html/feed.html</code>.</p>
+    </section>
+    <section class="glass card-s" id="profileCard" hidden>
+      <h3>Perfil</h3>
+      <p>Sua foto aparece em todas as publicações.</p>
+      <div class="stack">
+        <label class="btn btn-ghost" for="pfile">Trocar foto de perfil</label>
+        <input id="pfile" type="file" accept="image/*" hidden>
+      </div>
     </section>
   </aside>
 </div>
