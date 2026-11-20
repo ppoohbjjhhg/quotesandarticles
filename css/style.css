@@ -146,8 +146,8 @@ label.btn{display:block;text-align:center}
 .post::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:4px;border-radius:0 4px 4px 0;background:var(--acc)}
 .post .p-top .tag{display:inline-flex;align-items:center;gap:.3rem;color:var(--acc-t,var(--acc));background:color-mix(in srgb,var(--acc) 15%,transparent)}
 .post[data-cat="quote"] .p-text{border-left-color:var(--acc)}
-.chip[data-k="quote"].on{background:#2D6CDF}.chip[data-k="nota"].on{background:#D98E04}
-.chip[data-k="estudo"].on{background:#0E9F8E}.chip[data-k="artigo"].on{background:#7C4DFF}
+.chip[data-k="quote"].on{background:#2D6CDF}.chip[data-k="nota"].on{background:#005219}
+.chip[data-k="estudo"].on{background:#3b039a}.chip[data-k="artigo"].on{background:#cddf03}
 .chip{display:inline-flex;align-items:center;gap:.35rem}
 
 /* fontes do post */
