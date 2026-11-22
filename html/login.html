@@ -18,14 +18,29 @@
     <p class="sub">Quotes, notas, estudos e artigos.</p>
 
     <div class="seg" id="seg" data-i="0" role="tablist">
-      <button type="button" role="tab" aria-selected="true">Leitor</button>
-      <button type="button" role="tab" aria-selected="false">Administrador</button>
+      <button type="button" role="tab" aria-selected="true">Entrar</button>
+      <button type="button" role="tab" aria-selected="false">Criar conta</button>
+      <button type="button" role="tab" aria-selected="false">Admin</button>
     </div>
 
     <form id="readerForm" class="pane">
-      <label for="rname">Seu nome (aparece nas curtidas)</label>
-      <input id="rname" class="input" required maxlength="30" autocomplete="name" placeholder="Como quer ser chamado">
-      <button class="btn btn-primary" type="submit">Entrar como leitor</button>
+      <label for="ruser">Usuário</label>
+      <input id="ruser" class="input" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="seu_usuario">
+      <label for="rpass">Senha</label>
+      <input id="rpass" class="input" type="password" required autocomplete="current-password" placeholder="Sua senha">
+      <p class="err" id="rerr" role="alert"></p>
+      <button class="btn btn-primary" type="submit">Entrar</button>
+    </form>
+
+    <form id="signForm" class="pane" hidden>
+      <label for="sname">Seu nome</label>
+      <input id="sname" class="input" required maxlength="30" autocomplete="name" placeholder="Como quer ser chamado">
+      <label for="suser">Usuário (para entrar)</label>
+      <input id="suser" class="input" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="letras, números e _">
+      <label for="spass">Senha</label>
+      <input id="spass" class="input" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
+      <p class="err" id="serr" role="alert"></p>
+      <button class="btn btn-primary" type="submit">Criar conta</button>
     </form>
 
     <form id="adminForm" class="pane" hidden>
@@ -34,6 +49,7 @@
       <p class="err" id="err" role="alert"></p>
       <button class="btn btn-primary" type="submit">Entrar como administrador</button>
     </form>
+
     <p class="credit">by Pedro Henrique Frutuoso</p>
   </section>
 </main>

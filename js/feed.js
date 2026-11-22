@@ -1,8 +1,8 @@
 (() => {
   const S = Auth.session();
   if (!S) { location.replace('login.html'); return; }
-  const admin = S.role === 'admin';
-  if (admin && !S.token) { Auth.logout(); return; }
+  const admin = S.role === 'admin', reader = S.role === 'reader', logged = admin || reader, uid = S.uid;
+  if (logged && !S.token) { Auth.logout(); return; }
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -10,30 +10,52 @@
   const FONTS = { '': 'Padrão', serif: 'Serifa', mono: 'Mono', hand: 'Manuscrita', elegant: 'Elegante' };
   const COLORS = { '': 'Vidro', navy: 'Marinho', blue: 'Azul', sky: 'Céu', sand: 'Areia', mint: 'Menta', rose: 'Rosa', lilac: 'Lilás' };
   const SW = { '': '#ffffff', navy: '#0A1B33', blue: '#2D6CDF', sky: '#DCEAFF', sand: '#F5EBDD', mint: '#DDF3EA', rose: '#FBE3E8', lilac: '#E9E3FB' };
+  const THEMES = { blue: '#2D6CDF', navy: '#0A1B33', violet: '#7C4DFF', teal: '#0E9F8E', amber: '#D98E04', rose: '#E0245E', graphite: '#4B5563' };
+  // 15 temas, na ordem da lista de categorias do Substack (edite à vontade)
+  const TOPICS = ['Cultura', 'Tecnologia', 'Negócios', 'Política', 'Finanças', 'Gastronomia', 'Esportes', 'Arte e Ilustração', 'Saúde', 'Notícias', 'Moda e Beleza', 'Música', 'Fé e Espiritualidade', 'Meio Ambiente', 'Literatura'];
   const NAV = [['all', 'home', 'Início'], ['quote', 'quote', 'Quotes'], ['nota', 'note', 'Notas'], ['estudo', 'book', 'Estudos'], ['artigo', 'file', 'Artigos']];
-  const AUTHOR = { name: 'Pedro Henrique', handle: '@henrique' };
-  const KS = 'acervo_saved', MAX = 5;
+  if (logged) NAV.push(['saved', 'save', 'Salvos']);
+  if (reader) NAV.push(['profile', 'user', 'Perfil']);
+  const AUTHOR = { name: 'Pedro Henrique', handle: '@henrique' }, MAX = 5;
 
-  let posts = [], likes = {}, profile = {}, tab = 'all', cat = 'all', q = '';
+  let posts = [], likes = {}, comments = {}, cards = {}, saves = new Set(), profile = {}, me = null;
+  let view = 'feed', tab = 'all', cat = 'all', q = '';
   let editing = null, newCat = 'nota', font = '', color = '', imgs = [];
-  let saved = []; try { saved = JSON.parse(localStorage.getItem(KS)) || []; } catch {}
 
-  const avatarInner = () => profile.avatar ? `<img src="${esc(profile.avatar)}" alt="">` : esc(AUTHOR.name[0]);
-  const paintAvatars = () => { if (admin) { $('#meAv').innerHTML = avatarInner(); $('#cAv').innerHTML = avatarInner(); } };
+  // ---- identidade (nome social > nome)
+  const dn = m => (m && (m.social_name || m.name)) || 'Leitor';
+  const who = u => cards[u] || { display_name: 'Leitor', avatar: null, theme: 'blue' };
+  const initial = n => esc(((n || '?').trim()[0] || '?').toUpperCase());
+  const av = (c, size = 'm') => `<span class="av ${size}" style="--tc:${THEMES[c.theme] || THEMES.blue}">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : initial(c.display_name)}</span>`;
+  const myCard = () => admin ? { display_name: AUTHOR.name, avatar: profile.avatar, theme: 'navy' } : me ? { display_name: dn(me), avatar: me.avatar, theme: me.theme } : { display_name: S.name || 'Visitante' };
+  const authorInner = () => profile.avatar ? `<img src="${esc(profile.avatar)}" alt="">` : esc(AUTHOR.name[0]);
+  function paintMe() {
+    const c = myCard();
+    $('#meName').textContent = c.display_name;
+    $('#meRole').textContent = admin ? 'Administrador' : reader ? 'Leitor' : 'Sem conta';
+    $('#meAv').innerHTML = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : initial(c.display_name);
+    if (admin) $('#cAv').innerHTML = authorInner();
+  }
+  const needAccount = () => { if (logged) return false; if (confirm('Entre ou crie uma conta para interagir. Ir para o login?')) Auth.logout(); return true; };
 
-  // estrutura fixa
+  // ---- estrutura fixa
   $('#links').innerHTML = NAV.map(([k, i, l]) => `<button class="nav-link${k === 'all' ? ' on' : ''}" data-cat="${k}">${UI.icon(i)}<span>${l}</span></button>`).join('');
   $('#logout').innerHTML = UI.icon('out'); $('#logout').onclick = Auth.logout;
   $('#sIcon').innerHTML = UI.icon('search', 18);
-  $('#meName').textContent = S.name; $('#meRole').textContent = admin ? 'Administrador' : 'Leitor';
-  $('#meAv').textContent = S.name[0].toUpperCase();
+  paintMe();
 
+  function showView(v) {
+    view = v;
+    $('#profileView').hidden = v !== 'profile'; $('#tabs').hidden = v === 'profile';
+    $('#feed').style.display = v === 'profile' ? 'none' : 'grid';
+    if (admin) $('#composer').hidden = v === 'profile';
+  }
   $('#links').addEventListener('click', e => {
     const b = e.target.closest('.nav-link'); if (!b) return;
     cat = b.dataset.cat;
     document.querySelectorAll('.nav-link').forEach(x => x.classList.toggle('on', x === b));
-    $('#title').textContent = b.querySelector('span').textContent;
-    render();
+    $('#title').textContent = cat === 'profile' ? 'Meu perfil' : b.querySelector('span').textContent;
+    if (cat === 'profile') { showView('profile'); buildProfile(); } else { showView('feed'); render(); }
   });
   $('#tabs').addEventListener('click', e => {
     const b = e.target.closest('.tab'); if (!b) return;
@@ -41,19 +63,31 @@
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
     render();
   });
-  $('#search').addEventListener('input', e => { q = e.target.value.trim().toLowerCase(); render(); });
+  $('#search').addEventListener('input', e => { q = e.target.value.trim().toLowerCase(); if (view === 'feed') render(); });
 
   const fmt = d => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d));
+  const fmtT = d => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
 
-  // ---- curtidas
+  // ---- curtidas (com foto ao lado do nome)
   const likeBar = p => {
-    const n = likes[p.id] || [], on = n.includes(S.name);
+    const n = likes[p.id] || [], on = n.includes(uid);
     return `<button class="icon-btn like${on ? ' on' : ''}" data-act="like" aria-label="Curtir">${UI.icon('heart', 18)}</button><span class="like-n">${n.length || ''}</span>`;
   };
   function refreshLike(el, p) {
     el.querySelector('.lk').innerHTML = likeBar(p);
-    const L = el.querySelector('.likers'), n = likes[p.id] || [];
-    if (L) { L.hidden = !n.length; L.textContent = n.length ? 'Curtido por ' + n.join(', ') : ''; }
+    const ids = likes[p.id] || [], L = el.querySelector('.likers');
+    L.hidden = !ids.length;
+    L.innerHTML = ids.length ? 'Curtido por ' + ids.slice(0, 6).map(u => { const c = who(u); return `<span class="lk-u">${av(c, 's')}${esc(c.display_name)}</span>`; }).join('') + (ids.length > 6 ? `<span class="more">+${ids.length - 6}</span>` : '') : '';
+  }
+
+  // ---- comentários
+  function renderComments(el, id) {
+    const list = comments[id] || [];
+    el.querySelector('.cn').textContent = list.length || '';
+    el.querySelector('.cmt-list').innerHTML = list.map(c => {
+      const w = who(c.user_id), can = admin || c.user_id === uid;
+      return `<div class="cmt" data-cid="${esc(c.id)}">${av(w, 'm')}<div class="cmt-b"><b>${esc(w.display_name)}</b><small>${fmtT(c.created_at)}</small>${can ? `<button class="icon-btn" data-act="delc" aria-label="Apagar comentário">${UI.icon('trash', 14)}</button>` : ''}<p>${esc(c.text)}</p></div></div>`;
+    }).join('');
   }
 
   // ---- carrossel
@@ -80,7 +114,7 @@
     const el = document.createElement('article');
     el.className = 'post glass reveal' + ck; el.dataset.cat = p.cat; el.dataset.id = p.id;
     el.innerHTML = `
-      <div class="avatar">${avatarInner()}</div>
+      <div class="avatar">${authorInner()}</div>
       <div class="p-body">
         <div class="p-top"><b>${esc(AUTHOR.name)}</b><span>${AUTHOR.handle} · ${fmt(p.created_at)}${p.updated_at ? ' · editado' : ''}</span><span class="tag">${UI.icon(C.i, 13)}${C.l}</span></div>
         ${p.title ? `<h2 class="p-title${fk}">${esc(p.title)}</h2>` : ''}
@@ -88,22 +122,28 @@
         ${carousel(DB.imgs(p))}
         <div class="acts">
           <span class="lk"></span>
-          <button class="icon-btn${saved.includes(p.id) ? ' on' : ''}" data-act="save" aria-label="Salvar">${UI.icon('save', 18)}</button>
+          <button class="icon-btn" data-act="comments" aria-label="Comentários">${UI.icon('chat', 18)}</button><span class="like-n cn"></span>
+          <button class="icon-btn${saves.has(p.id) ? ' on' : ''}" data-act="save" aria-label="Salvar">${UI.icon('save', 18)}</button>
           <button class="icon-btn" data-act="copy" aria-label="Copiar texto">${UI.icon('copy', 18)}</button>
           ${admin ? `<button class="icon-btn" data-act="edit" aria-label="Editar">${UI.icon('edit', 18)}</button><button class="icon-btn" data-act="del" aria-label="Excluir">${UI.icon('trash', 18)}</button>` : ''}
         </div>
-        ${admin ? '<p class="likers" hidden></p>' : ''}
+        <p class="likers" hidden></p>
+        <div class="cmts" hidden>
+          <div class="cmt-list"></div>
+          ${logged ? '<form class="cmt-form"><input class="input" maxlength="500" placeholder="Escreva um comentário…" required><button class="btn btn-primary" type="submit">Enviar</button></form>' : '<p class="cmt-hint">Entre ou crie uma conta para comentar.</p>'}
+        </div>
       </div>`;
-    refreshLike(el, p);
+    refreshLike(el, p); renderComments(el, p.id);
     return el;
   }
 
   function render() {
+    if (view !== 'feed') return;
     const list = posts
-      .filter(p => (cat === 'all' || p.cat === cat) && (tab === 'all' || (tab === 'img' ? DB.imgs(p).length : !DB.imgs(p).length)) && (!q || `${p.title} ${p.text}`.toLowerCase().includes(q)))
+      .filter(p => (cat === 'all' || (cat === 'saved' ? saves.has(p.id) : p.cat === cat)) && (tab === 'all' || (tab === 'img' ? DB.imgs(p).length : !DB.imgs(p).length)) && (!q || `${p.title} ${p.text}`.toLowerCase().includes(q)))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const feed = $('#feed'); feed.innerHTML = '';
-    if (!list.length) { feed.innerHTML = '<p class="empty">Nada por aqui ainda.</p>'; return; }
+    if (!list.length) { feed.innerHTML = `<p class="empty">${cat === 'saved' ? 'Você ainda não salvou nenhum post.' : 'Nada por aqui ainda.'}</p>`; return; }
     const wrap = document.createDocumentFragment();
     list.forEach(p => wrap.append(card(p)));
     feed.append(wrap);
@@ -117,22 +157,27 @@
     if (d) { const t = d.parentElement.querySelector('.car-track'); t.scrollBy({ left: +d.dataset.dir * t.clientWidth, behavior: 'smooth' }); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const el = b.closest('.post'), id = el.dataset.id, p = posts.find(x => x.id === id), act = b.dataset.act;
-    if (act === 'save') {
-      saved = saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id];
-      localStorage.setItem(KS, JSON.stringify(saved)); b.classList.toggle('on');
-    } else if (act === 'copy') {
+    if (act === 'copy') {
       navigator.clipboard?.writeText(`${p.title ? p.title + '\n' : ''}${p.text}`).then(() => UI.toast('Copiado'));
+    } else if (act === 'comments') {
+      el.querySelector('.cmts').hidden = !el.querySelector('.cmts').hidden;
     } else if (act === 'like') {
-      let name = S.name;
-      if (name === 'Visitante') {
-        name = (prompt('Seu nome para curtir:') || '').trim().slice(0, 30); if (!name) return;
-        Auth.rename(name); S.name = name; $('#meName').textContent = name; if (!admin) $('#meAv').textContent = name[0].toUpperCase();
-      }
-      const arr = likes[id] || (likes[id] = []), i = arr.indexOf(name);
-      i > -1 ? arr.splice(i, 1) : arr.push(name);
+      if (needAccount()) return;
+      const arr = likes[id] || (likes[id] = []), i = arr.indexOf(uid);
+      i > -1 ? arr.splice(i, 1) : arr.push(uid);
       refreshLike(el, p);
-      try { await DB.toggleLike(id, name); }
-      catch { i > -1 ? arr.push(name) : arr.splice(arr.indexOf(name), 1); refreshLike(el, p); UI.toast('Não foi possível curtir agora.'); }
+      try { i > -1 ? await DB.unlike(id, uid) : await DB.like(id); }
+      catch { i > -1 ? arr.push(uid) : arr.splice(arr.indexOf(uid), 1); refreshLike(el, p); UI.toast('Não foi possível curtir agora.'); }
+    } else if (act === 'save') {
+      if (needAccount()) return;
+      const had = saves.has(id); had ? saves.delete(id) : saves.add(id); b.classList.toggle('on', !had);
+      try { had ? await DB.unsave(id) : await DB.save(id); if (cat === 'saved') render(); }
+      catch { had ? saves.add(id) : saves.delete(id); b.classList.toggle('on', had); UI.toast('Não foi possível salvar agora.'); }
+    } else if (act === 'delc') {
+      const cid = b.closest('.cmt').dataset.cid;
+      if (!confirm('Apagar este comentário?')) return;
+      try { await DB.delComment(cid); comments[id] = (comments[id] || []).filter(c => c.id !== cid); renderComments(el, id); }
+      catch { UI.toast('Não foi possível apagar.'); }
     } else if (act === 'edit' && admin) {
       startEdit(p);
     } else if (act === 'del' && admin && confirm('Excluir esta publicação para todos?')) {
@@ -140,6 +185,85 @@
       catch { UI.toast('Não foi possível excluir. Entre de novo como administrador.'); }
     }
   });
+  $('#feed').addEventListener('submit', async e => {
+    const f = e.target.closest('.cmt-form'); if (!f) return;
+    e.preventDefault();
+    const el = f.closest('.post'), id = el.dataset.id, inp = f.querySelector('input'), btn = f.querySelector('button'), text = inp.value.trim();
+    if (!text) return;
+    btn.disabled = true;
+    try { (comments[id] = comments[id] || []).push(await DB.addComment(id, text)); inp.value = ''; renderComments(el, id); }
+    catch { UI.toast('Não foi possível comentar agora.'); }
+    finally { btn.disabled = false; }
+  });
+
+  // ---- perfil do leitor
+  function buildProfile() {
+    const v = $('#profileView');
+    if (!reader || !me) { v.innerHTML = '<p class="empty">Perfil indisponível. Confira se o SQL v3 foi executado.</p>'; return; }
+    const pf = { theme: me.theme in THEMES ? me.theme : 'blue', topics: new Set(me.interests || []) };
+    const net = /^https:\/\/(www\.)?(x|twitter)\.com\//i.test(me.social || '') ? 'x' : 'instagram';
+    const handle = (me.social || '').split('/').filter(Boolean).pop() || '';
+    const nameLocked = me.name_changes >= 1;
+    v.style.setProperty('--tc', THEMES[pf.theme]);
+    v.innerHTML = `
+      <div class="pf-banner"></div>
+      <div class="pf-top">
+        <label class="pf-av" for="avfile" title="Trocar foto">${av(myCard(), 'l')}<span class="cam">${UI.icon('image', 16)}</span></label>
+        <input id="avfile" type="file" accept="image/*" hidden>
+        <div><h2>${esc(dn(me))}</h2><p class="muted">@${esc(me.username)}</p>${me.bio ? `<p class="pf-bio">${esc(me.bio)}</p>` : ''}</div>
+      </div>
+      <form id="pfForm" class="pf-form">
+        <label>Nome<input class="input" id="fName" maxlength="30" value="${esc(me.name)}" ${nameLocked ? 'disabled' : ''}><small>${nameLocked ? 'Você já usou a alteração de nome.' : 'Você pode alterar o nome apenas mais 1 vez.'}</small></label>
+        <label>Nome social<input class="input" id="fSocialName" maxlength="30" value="${esc(me.social_name || '')}" placeholder="Opcional"><small>Se preenchido, aparece no lugar do nome nos comentários, curtidas e perfil.</small></label>
+        <label>Idade<input class="input" id="fAge" type="number" min="5" max="120" value="${me.age ?? ''}"></label>
+        <label>Bio<input class="input" id="fBio" maxlength="25" value="${esc(me.bio || '')}" placeholder="Até 25 caracteres"><small id="bioN">${(me.bio || '').length}/25</small></label>
+        <label>Rede social<span class="row"><select class="sel-i" id="fNet"><option value="instagram"${net === 'instagram' ? ' selected' : ''}>Instagram</option><option value="x"${net === 'x' ? ' selected' : ''}>X</option></select><input class="input" id="fHandle" maxlength="31" value="${esc(handle)}" placeholder="@usuario"></span></label>
+        <div class="lbl">Tema do perfil<div class="swatches" id="fTheme">${Object.entries(THEMES).map(([k, c]) => `<button type="button" class="sw${k === pf.theme ? ' on' : ''}" data-t="${k}" title="${k}" aria-label="${k}" style="background:${c}"></button>`).join('')}</div></div>
+        <div class="lbl">Interesses de leitura <small id="intN">${pf.topics.size}/15</small><div class="topics" id="fTopics">${TOPICS.map(t => `<button type="button" class="topic${pf.topics.has(t) ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
+        <button class="btn btn-primary" type="submit">Salvar perfil</button>
+      </form>`;
+    const val = id => v.querySelector(id).value.trim();
+    v.querySelector('#fBio').addEventListener('input', e => { v.querySelector('#bioN').textContent = `${e.target.value.length}/25`; });
+    v.querySelector('#fTheme').addEventListener('click', e => {
+      const s = e.target.closest('.sw'); if (!s) return;
+      pf.theme = s.dataset.t; v.style.setProperty('--tc', THEMES[pf.theme]);
+      v.querySelectorAll('#fTheme .sw').forEach(x => x.classList.toggle('on', x === s));
+    });
+    v.querySelector('#fTopics').addEventListener('click', e => {
+      const t = e.target.closest('.topic'); if (!t) return;
+      pf.topics.has(t.dataset.t) ? pf.topics.delete(t.dataset.t) : pf.topics.add(t.dataset.t);
+      t.classList.toggle('on'); v.querySelector('#intN').textContent = `${pf.topics.size}/15`;
+    });
+    v.querySelector('#avfile').addEventListener('change', async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      try {
+        const url = await DB.upload(await shrink(f, 256, true), uid), old = me.avatar;
+        me = await DB.saveProfile(uid, { avatar: url }); if (old) DB.deleteImage(old);
+        cards[uid] = { id: uid, display_name: dn(me), avatar: me.avatar, theme: me.theme };
+        paintMe(); buildProfile(); UI.toast('Foto atualizada');
+      } catch { UI.toast('Não foi possível trocar a foto. Confira o SQL v3.'); }
+    });
+    v.querySelector('#pfForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const h = val('#fHandle').replace(/^@/, '').replace(/[^A-Za-z0-9_.]/g, '').slice(0, 30);
+      const patch = {
+        social_name: val('#fSocialName') || null, age: val('#fAge') ? +val('#fAge') : null, bio: val('#fBio') || null,
+        theme: pf.theme, interests: [...pf.topics],
+        social: h ? (v.querySelector('#fNet').value === 'x' ? `https://x.com/${h}` : `https://instagram.com/${h}`) : null
+      };
+      const nm = val('#fName');
+      if (!nameLocked && nm && nm !== me.name) {
+        if (nm.length < 5 || !/^[A-Za-zÀ-ÿ0-9]+$/.test(nm)) return UI.toast('Nome: mínimo 5 caracteres, só letras e números, sem espaços.');
+        if (!confirm('Atenção: você só pode alterar o nome mais uma vez. Continuar?')) return;
+        patch.name = nm;
+      }
+      try {
+        me = await DB.saveProfile(uid, patch);
+        cards[uid] = { id: uid, display_name: dn(me), avatar: me.avatar, theme: me.theme };
+        paintMe(); buildProfile(); UI.toast('Perfil salvo');
+      } catch (err) { UI.toast(/nome/i.test(err.body || '') ? 'O nome já foi alterado uma vez.' : 'Não foi possível salvar. Confira os campos.'); }
+    });
+  }
 
   // ---- administrador
   if (admin) {
@@ -147,14 +271,13 @@
     $('#attach').innerHTML = UI.icon('image');
     $('#cfont').innerHTML = Object.entries(FONTS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
     $('#swatches').innerHTML = Object.entries(COLORS).map(([k, l]) => `<button type="button" class="sw" data-c="${k}" title="${l}" aria-label="${l}" style="background:${SW[k]}"></button>`).join('');
-    paintAvatars();
 
     const buildCats = () => $('#cats').innerHTML = Object.entries(CATS).map(([k, c]) => `<button type="button" class="chip${k === newCat ? ' on' : ''}" data-k="${k}">${UI.icon(c.i, 13)}${c.l}</button>`).join('');
     const applyStyle = () => {
       $('#draft').className = 'draft' + (color ? ` has-pc pc-${color}` : '');
       $('#ctext').className = 'plain' + (font ? ' f-' + font : ''); $('#ctitle').className = 'plain' + (font ? ' f-' + font : '');
       $('#cfont').value = font;
-      document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.c === color));
+      document.querySelectorAll('#swatches .sw').forEach(s => s.classList.toggle('on', s.dataset.c === color));
     };
     const renderThumbs = () => {
       const t = $('#thumbs'); t.hidden = !imgs.length;
@@ -207,7 +330,7 @@
         } else {
           posts.unshift(await DB.add(body)); clearForm(); render(); UI.toast('Publicado para todos');
         }
-      } catch { UI.toast('Erro ao salvar. Confira o SQL da v2 e entre de novo como administrador.'); }
+      } catch { UI.toast('Erro ao salvar. Entre de novo como administrador.'); }
       finally { btn.textContent = editing ? 'Salvar alterações' : 'Publicar'; sync(); }
     };
 
@@ -216,8 +339,9 @@
       try {
         const url = await DB.upload(await shrink(f, 320, true)), old = profile.avatar;
         await DB.setAvatar(url); profile.avatar = url; if (old) DB.deleteImage(old);
-        paintAvatars(); render(); UI.toast('Foto de perfil atualizada');
-      } catch { UI.toast('Não foi possível trocar a foto. Confira o SQL da v2.'); }
+        if (profile.admin_id && cards[profile.admin_id]) cards[profile.admin_id].avatar = url;
+        paintMe(); render(); UI.toast('Foto de perfil atualizada');
+      } catch { UI.toast('Não foi possível trocar a foto.'); }
     });
 
     buildCats(); applyStyle(); sync();
@@ -245,10 +369,16 @@
   (async () => {
     $('#feed').innerHTML = '<p class="empty">Carregando…</p>';
     try {
-      const [ps, ls, pr] = await Promise.all([DB.list(), DB.likes().catch(() => []), DB.profile().catch(() => ({}))]);
+      const [ps, ls, cs, cd, pr] = await Promise.all([DB.list(), DB.likes().catch(() => []), DB.comments().catch(() => []), DB.cards().catch(() => []), DB.profile().catch(() => ({}))]);
       posts = ps; profile = pr || {};
-      ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.name));
-      paintAvatars(); render();
+      ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.user_id));
+      cs.forEach(c => (comments[c.post_id] = comments[c.post_id] || []).push(c));
+      cd.forEach(c => { cards[c.id] = c; });
+      if (logged) {
+        const [sv, mp] = await Promise.all([DB.saves().catch(() => []), reader ? DB.myProfile(uid).catch(() => null) : null]);
+        sv.forEach(s => saves.add(s.post_id)); me = mp || null;
+      }
+      paintMe(); render();
     } catch { $('#feed').innerHTML = '<p class="empty">Não foi possível carregar as publicações.</p>'; }
   })();
 })();
