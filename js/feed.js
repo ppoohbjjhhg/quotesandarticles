@@ -102,7 +102,7 @@
   });
   $('#search').addEventListener('input', e => { q = e.target.value.trim().toLowerCase(); if (view === 'feed') render(); });
 
-  const fmt = d => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d));
+  const fmt = d => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
   const fmtT = d => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
   const fmtM = d => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(d));
 
@@ -154,7 +154,7 @@
     el.innerHTML = `
       ${av(ac, 'x')}
       <div class="p-body">
-        <div class="p-top">${ulink(ac)}${ceoBadge()}<span>@${esc(ac.username || 'henrique')} · ${fmt(p.created_at)}${p.updated_at ? ' · editado' : ''}</span><span class="tag">${UI.icon(C.i, 13)}${C.l}</span></div>
+        <div class="p-top">${ulink(ac)}${ceoBadge()}<span>@${esc(ac.username || 'henrique')} · ${fmt(p.created_at)}${p.updated_at ? ` · <span title="Editado em ${esc(fmt(p.updated_at))}">editado</span>` : ''}</span><span class="tag">${UI.icon(C.i, 13)}${C.l}</span></div>
         ${p.title ? `<h2 class="p-title${fk}">${esc(p.title)}</h2>` : ''}
         ${p.text ? `<p class="p-text${fk}">${esc(p.text)}</p>` : ''}
         ${carousel(DB.imgs(p))}
