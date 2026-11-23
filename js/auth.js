@@ -25,7 +25,7 @@ const Auth = (() => {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       const t = JSON.stringify(j).toLowerCase();
-      if (t.includes('already')) return 'taken';
+      if (t.includes('already') || t.includes('database error')) return 'taken';
       if (t.includes('signup') && t.includes('disabled')) return 'disabled';
       if (t.includes('weak') || t.includes('password')) return 'weak';
       throw new Error('signup');

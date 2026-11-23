@@ -16,7 +16,7 @@
     <div class="brand"><span class="mark sm" aria-hidden="true">“</span><strong>Acervo</strong></div>
     <div class="links" id="links"></div>
     <div class="me">
-      <div class="avatar" id="meAv"></div>
+      <div id="meAv"></div>
       <div class="me-t"><b id="meName"></b><small id="meRole"></small></div>
       <button class="icon-btn" id="logout" title="Sair" aria-label="Sair"></button>
     </div>
@@ -33,7 +33,7 @@
     </header>
 
     <section class="composer glass" id="composer" hidden>
-      <div class="avatar" id="cAv"></div>
+      <div id="cAv"></div>
       <div class="c-body">
         <div class="edit-flag" id="editFlag" hidden>Editando publicação <button type="button" class="link" id="cancelEdit">cancelar</button></div>
         <div class="chips" id="cats"></div>
@@ -48,7 +48,7 @@
         </div>
         <div class="c-row">
           <div class="c-tools">
-            <label class="icon-btn" for="cfile" id="attach" title="Adicionar fotos (até 5)"></label>
+            <label class="icon-btn" for="cfile" id="attach" title="Adicionar fotos ou GIFs (até 5)"></label>
             <span class="count" id="imgCount"></span>
           </div>
           <input id="cfile" type="file" accept="image/*" multiple hidden>
@@ -59,6 +59,8 @@
 
     <section class="profile glass" id="profileView" hidden></section>
 
+    <section class="rank glass" id="rankView" hidden></section>
+
     <div id="feed"></div>
   </main>
 
@@ -67,14 +69,6 @@
     <section class="glass card-s">
       <h3>Sobre</h3>
       <p>Um acervo pessoal de quotes, notas, estudos e artigos. Edite este texto em <code>html/feed.html</code>.</p>
-    </section>
-    <section class="glass card-s" id="profileCard" hidden>
-      <h3>Perfil</h3>
-      <p>Sua foto aparece em todas as publicações.</p>
-      <div class="stack">
-        <label class="btn btn-ghost" for="pfile">Trocar foto de perfil</label>
-        <input id="pfile" type="file" accept="image/*" hidden>
-      </div>
     </section>
   </aside>
 </div>

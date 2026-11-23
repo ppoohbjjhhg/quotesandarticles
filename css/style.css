@@ -253,3 +253,62 @@ label.btn{display:block;text-align:center}
 .topic:active{transform:scale(.94)}
 .topic.on{background:var(--tc);border-color:var(--tc);color:#fff}
 .profile .sw.on{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--tc)}
+/* ===== v4: molduras por nível, ranking, perfil público e do CEO, GIFs ===== */
+.av{position:relative}
+.av .in{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;overflow:hidden;font-style:normal;background:linear-gradient(135deg,var(--blue),var(--navy))}
+.av.x{width:42px;height:42px;font-size:1rem}
+.av[data-user]{cursor:pointer}
+.av.fr{box-shadow:none;padding:3px;background:var(--fr)}
+.av.s.fr{padding:2px}.av.l.fr{padding:5px}
+.pf-av .av.l.fr{box-shadow:none}
+.fr-bronze{--fr:linear-gradient(135deg,#F3BE8A,#8A4B1F)}
+.fr-prata{--fr:linear-gradient(135deg,#FFFFFF,#9AA5B1)}
+.fr-ouro{--fr:linear-gradient(135deg,#FFE27A,#E0A400);filter:drop-shadow(0 0 4px rgba(245,179,1,.55))}
+.fr-diamante{--fr:linear-gradient(135deg,#7DE3FF,#7C4DFF 55%,#7DE3FF);filter:drop-shadow(0 0 5px rgba(125,227,255,.6))}
+.fr-lendario{--fr:linear-gradient(120deg,#FF5C8A,#FFD36B,#5BE7C4,#5B93F5,#B07CFF,#FF5C8A);filter:drop-shadow(0 0 6px rgba(176,124,255,.6))}
+.av.fr-lendario{background-size:300% 300%;animation:frshift 4s linear infinite}
+.fr-ceo{--fr:linear-gradient(135deg,#FFE27A,#B8860B 50%,#0A1B33);filter:drop-shadow(0 0 5px rgba(245,179,1,.5))}
+@keyframes frshift{to{background-position:300% 0}}
+
+.ulink{background:none;border:0;padding:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;text-align:left}
+.ulink:hover{text-decoration:underline}
+.ceo{display:inline-flex;align-items:center;gap:.25rem;font-size:.66rem;font-weight:700;letter-spacing:.05em;padding:.12rem .5rem;border-radius:999px;background:linear-gradient(135deg,#FFE27A,#E0A400);color:#3A2A00;vertical-align:middle}
+.lvl{display:inline-flex;align-items:center;font-size:.68rem;font-weight:700;padding:.12rem .55rem;border-radius:999px;background:color-mix(in srgb,var(--lc,#8896AB) 16%,transparent);color:var(--lc,#8896AB);vertical-align:middle}
+.th.gif::after{content:"GIF";position:absolute;left:4px;bottom:4px;font-size:.6rem;font-weight:700;padding:.05rem .35rem;border-radius:6px;background:rgba(10,27,51,.75);color:#fff}
+.profile h2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.back{justify-self:start;font-size:.82rem}
+.pf-links{display:flex;flex-wrap:wrap;gap:.5rem}
+.pf-links .btn{display:inline-block}
+
+/* ranking */
+.rank{padding:1.1rem;display:grid;gap:.6rem}.rank[hidden]{display:none}
+.rk-h{font-size:1.1rem}
+.rk{display:flex;align-items:center;gap:.8rem;padding:.6rem .8rem;border-radius:16px;background:rgba(255,255,255,.55)}
+.rk.me{box-shadow:0 0 0 2px var(--blue)}
+.rk .pos{width:26px;text-align:center;font-weight:700;color:var(--muted)}
+.rk.top1 .pos{color:#C48A00}.rk.top2 .pos{color:#7C8794}.rk.top3 .pos{color:#B8742F}
+.rk-n{flex:1;min-width:0;display:grid}
+.rk-n small{display:flex;gap:.7rem;color:var(--muted);font-size:.74rem}
+.rk-n small span{display:inline-flex;gap:.25rem;align-items:center}
+.rk-t{font-size:1.05rem;min-width:2ch;text-align:right}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem}
+.stat{display:grid;padding:.7rem .9rem;border-radius:16px;background:rgba(255,255,255,.55)}
+.stat b{font-size:1.2rem}.stat span{font-size:.74rem;color:var(--muted)}
+.lvbox{display:grid;gap:.45rem;padding:.9rem 1rem;border-radius:16px;background:rgba(255,255,255,.55)}
+.lv-top{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.prog{height:8px;border-radius:99px;background:rgba(10,27,51,.1);overflow:hidden}
+.prog i{display:block;height:100%;width:var(--p,0%);background:linear-gradient(90deg,var(--blue),var(--navy));transition:width .6s var(--ease)}
+
+/* perfil do CEO: visual próprio */
+.profile.is-ceo{background:linear-gradient(160deg,rgba(10,27,51,.95),rgba(22,49,92,.92));color:#fff;border-color:rgba(255,226,122,.4);box-shadow:inset 0 1px 0 rgba(255,226,122,.35),0 18px 40px -16px rgba(10,27,51,.7)}
+.is-ceo .pf-banner{background:linear-gradient(135deg,var(--tc),#0A1B33 55%,#E0A400)}
+.is-ceo .muted,.is-ceo .pf-form label,.is-ceo .lbl,.is-ceo small{color:#B8C4D8}
+.is-ceo .input,.is-ceo .sel-i{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.2)}
+.is-ceo .topic{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.18)}
+.is-ceo .topic.on{background:linear-gradient(135deg,#FFE27A,#E0A400);color:#3A2A00;border-color:transparent}
+.is-ceo .stat,.is-ceo .lvbox{background:rgba(255,255,255,.08)}
+.is-ceo .stat span{color:#B8C4D8}
+.is-ceo .btn-ghost{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)}
+.is-ceo .link{color:#B8C4D8}
+.is-ceo .cam{background:#E0A400;color:#3A2A00;border-color:#0A1B33}
+.is-ceo .pf-top h2{color:#fff}

@@ -35,8 +35,9 @@ const DB = (() => {
   // imagens (admin na raiz; leitores só na própria pasta, para a foto de perfil)
   async function upload(dataUrl, folder = '') {
     const blob = await (await fetch(dataUrl)).blob();
-    const name = `${folder ? folder + '/' : ''}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-    await req(`/storage/v1/object/images/${name}`, { method: 'POST', body: blob, auth: true, ct: 'image/jpeg' });
+    const gif = blob.type === 'image/gif';
+    const name = `${folder ? folder + '/' : ''}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${gif ? 'gif' : 'jpg'}`;
+    await req(`/storage/v1/object/images/${name}`, { method: 'POST', body: blob, auth: true, ct: gif ? 'image/gif' : 'image/jpeg' });
     return `${C().SUPABASE_URL}/storage/v1/object/public/images/${name}`;
   }
   async function deleteImage(url) {
