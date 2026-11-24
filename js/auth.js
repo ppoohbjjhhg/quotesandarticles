@@ -19,9 +19,12 @@ const Auth = (() => {
     return true;
   }
   const loginAdmin = pw => signIn('admin', C().ADMIN_EMAIL, pw);
-  const loginReader = (user, pw) => signIn('reader', mail(user), pw);
-  async function signup(name, user, pw) {
-    const r = await post('signup', { email: mail(user), password: pw, data: { username: user.toLowerCase(), name } });
+  // o Supabase exige senha com 6+ caracteres: completamos a senha de 5 com um sufixo interno.
+  // Contas antigas (senha sem sufixo) continuam entrando pela segunda tentativa.
+  const padPw = p => p + '#acv';
+  const loginReader = async (user, pw) => (await signIn('reader', mail(user), padPw(pw))) || signIn('reader', mail(user), pw);
+  async function signup(social, user, pw) {
+    const r = await post('signup', { email: mail(user), password: padPw(pw), data: { username: user.toLowerCase(), social_name: social } });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       const t = JSON.stringify(j).toLowerCase();

@@ -8,13 +8,14 @@
 
   const CATS = { quote: { l: 'Quote', i: 'quote' }, nota: { l: 'Nota', i: 'note' }, estudo: { l: 'Estudo', i: 'book' }, artigo: { l: 'Artigo', i: 'file' } };
   const FONTS = { '': 'Padrão', serif: 'Serifa', mono: 'Mono', hand: 'Manuscrita', elegant: 'Elegante' };
-  const COLORS = { '': 'Vidro', navy: 'Marinho', blue: 'Azul', sky: 'Céu', sand: 'Areia', mint: 'Menta', rose: 'Rosa', lilac: 'Lilás' };
-  const SW = { '': '#ffffff', navy: '#0A1B33', blue: '#2D6CDF', sky: '#DCEAFF', sand: '#F5EBDD', mint: '#DDF3EA', rose: '#FBE3E8', lilac: '#E9E3FB' };
-  const THEMES = { blue: '#2D6CDF', navy: '#0A1B33', violet: '#7C4DFF', teal: '#0E9F8E', amber: '#D98E04', rose: '#E0245E', graphite: '#4B5563' };
+  const COLORS = { '': 'Vidro', navy: 'Marinho', blue: 'Azul', sky: 'Céu', sand: 'Areia', mint: 'Menta', rose: 'Rosa', lilac: 'Lilás', peach: 'Pêssego', lemon: 'Limão', aqua: 'Água', coral: 'Coral', violet: 'Violeta', forest: 'Floresta', graphite: 'Grafite' };
+  const SW = { '': '#ffffff', navy: '#0A1B33', blue: '#2D6CDF', sky: '#DCEAFF', sand: '#F5EBDD', mint: '#DDF3EA', rose: '#FBE3E8', lilac: '#E9E3FB', peach: '#FFE4D1', lemon: '#FFF6C7', aqua: '#D2F4F7', coral: '#E85D5D', violet: '#6D3FE0', forest: '#14532D', graphite: '#252A36' };
+  const THEMES = { blue: '#2D6CDF', navy: '#0A1B33', indigo: '#4F46E5', violet: '#7C4DFF', magenta: '#C026D3', rose: '#E0245E', crimson: '#B91C1C', orange: '#EA580C', amber: '#D98E04', lime: '#65A30D', emerald: '#059669', teal: '#0E9F8E', cyan: '#0891B2', sky: '#38BDF8', coffee: '#7A4B2A', graphite: '#4B5563' };
   // 15 temas, na ordem da lista de categorias do Substack (edite à vontade)
   const TOPICS = ['Cultura', 'Tecnologia', 'Negócios', 'Política', 'Finanças', 'Gastronomia', 'Esportes', 'Arte e Ilustração', 'Saúde', 'Notícias', 'Moda e Beleza', 'Música', 'Fé e Espiritualidade', 'Meio Ambiente', 'Literatura'];
   // níveis por interações (curtidas + comentários). A partir do Bronze o leitor ganha moldura.
-  const LEVELS = [{ k: 'novato', n: 'Novato', min: 0 }, { k: 'bronze', n: 'Bronze', min: 10 }, { k: 'prata', n: 'Prata', min: 30 }, { k: 'ouro', n: 'Ouro', min: 75 }, { k: 'diamante', n: 'Diamante', min: 150 }, { k: 'lendario', n: 'Lendário', min: 300 }];
+  // Para evoluir os requisitos no futuro, mude só os números de 'min' abaixo.
+  const LEVELS = [{ k: 'novato', n: 'Novato', min: 0 }, { k: 'bronze', n: 'Bronze', min: 10 }, { k: 'prata', n: 'Prata', min: 20 }, { k: 'ouro', n: 'Ouro', min: 35 }, { k: 'diamante', n: 'Diamante', min: 50 }, { k: 'lendario', n: 'Lendário', min: 70 }];
   const LC = { novato: '#8896AB', bronze: '#B8742F', prata: '#7C8794', ouro: '#C48A00', diamante: '#2F9FD0', lendario: '#A23FE8' };
   const NAV = [['all', 'home', 'Início'], ['quote', 'quote', 'Quotes'], ['nota', 'note', 'Notas'], ['estudo', 'book', 'Estudos'], ['artigo', 'file', 'Artigos'], ['ranking', 'trophy', 'Ranking']];
   if (logged) NAV.push(['saved', 'save', 'Salvos'], ['profile', 'user', 'Perfil']);
@@ -83,14 +84,27 @@
     document.querySelectorAll('.nav-link').forEach(x => x.classList.toggle('on', x.dataset.cat === k));
     $('#title').textContent = (NAV.find(n => n[0] === k) || [])[2] || 'Início';
     if (k === 'profile') { showView('profile'); buildProfile(); }
-    else if (k === 'ranking') { showView('ranking'); buildRanking(); }
+    else if (k === 'ranking') { showView('ranking'); buildRanking(); refreshSocial().then(() => { if (view === 'ranking') buildRanking(); }); }
     else { showView('feed'); render(); }
   }
-  function openUser(u) {
+  async function refreshSocial() {   // traz curtidas, comentários e perfis novos
+    try {
+      const [ls, cs, cd] = await Promise.all([DB.likes(), DB.comments(), DB.cards()]);
+      likes = {}; comments = {};
+      ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.user_id));
+      cs.forEach(c => (comments[c.post_id] = comments[c.post_id] || []).push(c));
+      cd.forEach(c => { cards[c.id] = c; });
+      computeStats();
+    } catch {}
+  }
+  let openedUser = null;
+  async function openUser(u) {
     if (logged && u === uid) return navTo('profile');
     document.querySelectorAll('.nav-link').forEach(x => x.classList.remove('on'));
-    $('#title').textContent = 'Perfil'; showView('user'); buildPublic(u);
+    $('#title').textContent = 'Perfil'; showView('user'); openedUser = u; buildPublic(u);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    await refreshSocial();
+    if (view === 'user' && openedUser === u) buildPublic(u, true);
   }
   $('#links').addEventListener('click', e => { const b = e.target.closest('.nav-link'); if (b) navTo(b.dataset.cat); });
   document.addEventListener('click', e => { const u = e.target.closest('[data-user]'); if (u) openUser(u.dataset.user); });
@@ -238,65 +252,88 @@
   function buildRanking() {
     const v = $('#rankView');
     const rows = Object.entries(stats).filter(([u, s]) => s.total > 0 && !(cards[u] && cards[u].is_admin)).sort((a, b) => b[1].total - a[1].total || b[1].comments - a[1].comments).slice(0, 20);
-    v.innerHTML = `<h2 class="rk-h">Ranking de leitores</h2>
-      <p class="muted">Cada curtida vale 1 ponto e cada comentário também (até 3 por post). Molduras: ${LEVELS.filter(l => l.min).map(l => `<b style="color:${LC[l.k]}">${l.n}</b> ${l.min}`).join(' · ')}.</p>` +
+    v.innerHTML = `<h2 class="rk-h">Ranking de leitores</h2><p class="muted">1 ponto por curtida ou comentário.</p>
+      <div class="lg">${LEVELS.filter(l => l.min).map(l => `<span style="--lc:${LC[l.k]}">${l.n} · ${l.min}</span>`).join('')}</div>` +
       (rows.length ? rows.map(([u, s], i) => `<div class="rk top${i + 1}${u === uid ? ' me' : ''}"><span class="pos">${i + 1}</span>${av(who(u), 'm')}<div class="rk-n">${ulink(who(u))}<small><span>${UI.icon('heart', 12)}${s.likes}</span><span>${UI.icon('chat', 12)}${s.comments}</span></small></div>${lvlBadge(u)}<b class="rk-t">${s.total}</b></div>`).join('')
         : '<p class="empty">Ninguém pontuou ainda. Curta e comente para aparecer aqui!</p>');
   }
 
-  // ---- perfil público (qualquer pessoa)
+  // ---- perfis (visual novo)
+  const themeOf = c => THEMES[c.theme] || THEMES.blue;
   const socialLink = s => {
     if (!/^https:\/\/(www\.)?(instagram\.com|x\.com|twitter\.com)\/[A-Za-z0-9_.]{1,30}\/?$/i.test(s || '')) return '';
     return `<a class="btn btn-ghost" href="${esc(s)}" target="_blank" rel="noopener noreferrer nofollow">${/instagram/i.test(s) ? 'Instagram' : 'X'}</a>`;
   };
-  function buildPublic(u) {
+  const halo = c => `<div class="halo lv-${c.is_admin ? 'ceo' : levelOf(c.id).k}"><span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>${c.is_admin ? `<span class="crown">${UI.icon('crown', 26)}</span>` : ''}${av(c, 'xl', false)}</div>`;
+  function hero(c, o = {}) {
+    const ceo = !!c.is_admin;
+    return `<div class="hero"><div class="hero-bg"><i></i><i></i><i></i></div>
+      ${o.back ? '<button type="button" class="hero-back" id="back">← Voltar</button>' : ''}
+      ${o.edit ? `<label class="pf-av" for="avfile" title="Trocar foto">${halo(c)}<span class="cam">${UI.icon('image', 16)}</span></label><input id="avfile" type="file" accept="image/*" hidden>` : halo(c)}
+      <h2>${esc(c.display_name)} ${ceo ? ceoBadge() : lvlBadge(c.id, true)}</h2>
+      <p class="hero-u">@${esc(c.username || '')}${ceo ? ' · CEO e fundador' : ''}</p>
+      ${c.bio ? `<p class="pf-bio">${esc(c.bio)}</p>` : ''}</div>`;
+  }
+  const st2 = (ic, n, label) => `<div class="st2"><span class="ic">${UI.icon(ic, 18)}</span><b data-count="${n}">0</b><small>${label}</small></div>`;
+  function levelBox(u) {
+    const t = total(u), lv = levelOf(u), nx = nextLevel(u);
+    return `<div class="lvbox"><div class="lv-top">${lvlBadge(u, true)}<span class="muted">${t} ${t === 1 ? 'interação' : 'interações'}</span></div>
+      ${nx ? `<div class="prog" style="--p:${Math.min(100, ((t - lv.min) / (nx.min - lv.min)) * 100)}%"><i></i></div><small class="muted">Faltam ${nx.min - t} para ${nx.n} e uma nova moldura.</small>` : '<small class="muted">Nível máximo alcançado!</small>'}</div>`;
+  }
+  function countUp(root) {
+    root.querySelectorAll('[data-count]').forEach(el => {
+      const n = +el.dataset.count, t0 = performance.now();
+      const step = t => { const p = Math.min(1, (t - t0) / 700); el.textContent = Math.round(n * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  }
+  const received = () => Object.values(likes).reduce((n, a) => n + a.length, 0);
+  const readersCount = () => Object.values(cards).filter(x => !x.is_admin).length;
+
+  function buildPublic(u, final) {
     const v = $('#profileView'), c = cards[u];
-    if (!c) { v.className = 'profile glass'; v.innerHTML = '<button type="button" class="link back" id="back">← Voltar</button><p class="empty">Perfil não encontrado.</p>'; $('#back').onclick = () => navTo(cat); return; }
+    v.className = 'pf glass' + (c && c.is_admin ? ' is-ceo' : '');
+    if (!c) {
+      v.innerHTML = `<div class="pf-body"><p class="empty">${final ? 'Perfil não encontrado.' : 'Carregando perfil…'}</p><button type="button" class="link" id="back">← Voltar</button></div>`;
+      $('#back').onclick = () => navTo(cat); return;
+    }
+    v.style.setProperty('--tc', themeOf(c));
     const ceo = !!c.is_admin, st = stats[u] || { likes: 0, comments: 0, total: 0 };
-    v.className = 'profile glass' + (ceo ? ' is-ceo' : ''); v.style.setProperty('--tc', THEMES[c.theme] || THEMES.blue);
-    v.innerHTML = `
-      <button type="button" class="link back" id="back">← Voltar</button>
-      <div class="pf-banner"></div>
-      <div class="pf-top">${av(c, 'l', false)}<div><h2>${esc(c.display_name)} ${ceo ? ceoBadge() : lvlBadge(u, true)}</h2><p class="muted">@${esc(c.username || '')}${ceo ? ' · CEO e fundador' : ''}</p>${c.bio ? `<p class="pf-bio">${esc(c.bio)}</p>` : ''}</div></div>
-      <div class="stats">${ceo
-        ? `<div class="stat"><b>${posts.length}</b><span>Publicações</span></div>`
-        : `<div class="stat"><b>${st.likes}</b><span>Curtidas</span></div><div class="stat"><b>${st.comments}</b><span>Comentários</span></div><div class="stat"><b>${st.total}</b><span>Interações</span></div>`}</div>
-      ${(c.interests || []).length ? `<div class="lbl">Interesses de leitura<div class="topics">${c.interests.map(t => `<span class="topic on">${esc(t)}</span>`).join('')}</div></div>` : ''}
-      ${socialLink(c.social) ? `<div class="pf-links">${socialLink(c.social)}</div>` : ''}
-      ${c.created_at ? `<p class="muted">Membro desde ${esc(fmtM(c.created_at))}</p>` : ''}`;
+    v.innerHTML = hero(c, { back: true }) + `<div class="pf-body">
+      <div class="st-grid">${ceo ? st2('file', posts.length, 'Publicações') + st2('heart', received(), 'Curtidas recebidas') + st2('user', readersCount(), 'Leitores')
+        : st2('heart', st.likes, 'Curtidas') + st2('chat', st.comments, 'Comentários') + st2('trophy', st.total, 'Interações')}</div>
+      ${ceo ? '' : levelBox(u)}
+      ${(c.interests || []).length ? `<section class="pf-sec"><h3>Interesses de leitura</h3><div class="topics">${c.interests.map(t => `<span class="topic on">${esc(t)}</span>`).join('')}</div></section>` : ''}
+      ${socialLink(c.social) ? `<section class="pf-sec"><h3>Redes</h3><div class="pf-links">${socialLink(c.social)}</div></section>` : ''}
+      ${c.created_at ? `<p class="since">Membro desde ${esc(fmtM(c.created_at))}</p>` : ''}</div>`;
     $('#back').onclick = () => navTo(cat);
+    countUp(v);
   }
 
-  // ---- meu perfil (editável; leitor e CEO)
   function buildProfile() {
     const v = $('#profileView');
-    v.className = 'profile glass' + (admin ? ' is-ceo' : '');
-    if (!logged || !me) { v.innerHTML = '<p class="empty">Perfil indisponível. Confira se o SQL v4 foi executado.</p>'; return; }
+    v.className = 'pf glass' + (admin ? ' is-ceo' : '');
+    if (!logged || !me) { v.innerHTML = '<div class="pf-body"><p class="empty">Perfil indisponível. Confira se o SQL v4 foi executado.</p></div>'; return; }
     const pf = { theme: me.theme in THEMES ? me.theme : 'blue', topics: new Set(me.interests || []) };
     const net = /^https:\/\/(www\.)?(x|twitter)\.com\//i.test(me.social || '') ? 'x' : 'instagram';
     const handle = (me.social || '').split('/').filter(Boolean).pop() || '';
-    const nameLocked = me.name_changes >= 1, c = myCard(), st = stats[uid] || { likes: 0, comments: 0, total: 0 }, lv = levelOf(uid), nx = nextLevel(uid);
+    const nameLocked = me.name_changes >= 1, c = myCard(), st = stats[uid] || { likes: 0, comments: 0, total: 0 };
     v.style.setProperty('--tc', THEMES[pf.theme]);
-    v.innerHTML = `
-      <div class="pf-banner"></div>
-      <div class="pf-top">
-        <label class="pf-av" for="avfile" title="Trocar foto">${av(c, 'l', false)}<span class="cam">${UI.icon('image', 16)}</span></label>
-        <input id="avfile" type="file" accept="image/*" hidden>
-        <div><h2>${esc(dn(me))} ${admin ? ceoBadge() : lvlBadge(uid, true)}</h2><p class="muted">@${esc(me.username)}${admin ? ' · CEO e fundador' : ''}</p>${me.bio ? `<p class="pf-bio">${esc(me.bio)}</p>` : ''}</div>
-      </div>
-      ${admin ? `<div class="stats"><div class="stat"><b>${posts.length}</b><span>Publicações</span></div><div class="stat"><b>${Object.keys(cards).length - 1}</b><span>Leitores</span></div></div>`
-        : `<div class="lvbox"><div class="lv-top">${lvlBadge(uid, true)}<span class="muted">${st.total} interações · ${st.likes} curtidas · ${st.comments} comentários</span></div>
-           ${nx ? `<div class="prog" style="--p:${Math.min(100, ((st.total - lv.min) / (nx.min - lv.min)) * 100)}%"><i></i></div><small class="muted">Faltam ${nx.min - st.total} para ${nx.n} e uma moldura nova.</small>` : '<small class="muted">Nível máximo alcançado!</small>'}</div>`}
+    v.innerHTML = hero({ ...c, bio: me.bio, username: me.username }, { edit: true }) + `<div class="pf-body">
+      <div class="st-grid">${admin ? st2('file', posts.length, 'Publicações') + st2('heart', received(), 'Curtidas recebidas') + st2('user', readersCount(), 'Leitores')
+        : st2('heart', st.likes, 'Curtidas') + st2('chat', st.comments, 'Comentários') + st2('trophy', st.total, 'Interações')}</div>
+      ${admin ? '' : levelBox(uid)}
       <form id="pfForm" class="pf-form">
         <label>Nome<input class="input" id="fName" maxlength="30" value="${esc(me.name)}" ${nameLocked ? 'disabled' : ''}><small>${nameLocked ? 'Você já usou a alteração de nome.' : 'Você pode alterar o nome apenas mais 1 vez.'}</small></label>
-        <label>Nome social<input class="input" id="fSocialName" maxlength="30" value="${esc(me.social_name || '')}" placeholder="Opcional"><small>Se preenchido, aparece no lugar do nome nos comentários, curtidas e perfil.</small></label>
+        <label>Nome social<input class="input" id="fSocialName" maxlength="30" value="${esc(me.social_name || '')}" placeholder="Opcional"><small>Aparece no lugar do nome nos comentários, curtidas e perfil.</small></label>
         <label>Idade<input class="input" id="fAge" type="number" min="5" max="120" value="${me.age ?? ''}"><small>Fica privada: só você vê.</small></label>
         <label>Bio<input class="input" id="fBio" maxlength="25" value="${esc(me.bio || '')}" placeholder="Até 25 caracteres"><small id="bioN">${(me.bio || '').length}/25</small></label>
-        <label>Rede social<span class="row"><select class="sel-i" id="fNet"><option value="instagram"${net === 'instagram' ? ' selected' : ''}>Instagram</option><option value="x"${net === 'x' ? ' selected' : ''}>X</option></select><input class="input" id="fHandle" maxlength="31" value="${esc(handle)}" placeholder="@usuario"></span></label>
-        <div class="lbl">Tema do perfil<div class="swatches" id="fTheme">${Object.entries(THEMES).map(([k, col]) => `<button type="button" class="sw${k === pf.theme ? ' on' : ''}" data-t="${k}" title="${k}" aria-label="${k}" style="background:${col}"></button>`).join('')}</div></div>
-        <div class="lbl">Interesses de leitura <small id="intN">${pf.topics.size}/15</small><div class="topics" id="fTopics">${TOPICS.map(t => `<button type="button" class="topic${pf.topics.has(t) ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
-        <button class="btn btn-primary" type="submit">Salvar perfil</button>
-      </form>`;
+        <label class="full">Rede social<span class="row"><select class="sel-i" id="fNet"><option value="instagram"${net === 'instagram' ? ' selected' : ''}>Instagram</option><option value="x"${net === 'x' ? ' selected' : ''}>X</option></select><input class="input" id="fHandle" maxlength="31" value="${esc(handle)}" placeholder="@usuario"></span></label>
+        <div class="lbl full">Cor do perfil<div class="swatches" id="fTheme">${Object.entries(THEMES).map(([k, col]) => `<button type="button" class="sw${k === pf.theme ? ' on' : ''}" data-t="${k}" title="${k}" aria-label="${k}" style="background:${col}"></button>`).join('')}</div></div>
+        <div class="lbl full">Interesses de leitura <small id="intN">${pf.topics.size}/15</small><div class="topics" id="fTopics">${TOPICS.map(t => `<button type="button" class="topic${pf.topics.has(t) ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
+        <button class="btn btn-primary full" type="submit">Salvar perfil</button>
+      </form></div>`;
+    countUp(v);
     const val = id => v.querySelector(id).value.trim();
     v.querySelector('#fBio').addEventListener('input', e => { v.querySelector('#bioN').textContent = `${e.target.value.length}/25`; });
     v.querySelector('#fTheme').addEventListener('click', e => {
@@ -310,7 +347,7 @@
       t.classList.toggle('on'); v.querySelector('#intN').textContent = `${pf.topics.size}/15`;
     });
     const sync = () => {
-      cards[uid] = { ...cards[uid], id: uid, display_name: dn(me), avatar: me.avatar, theme: me.theme, bio: me.bio, interests: me.interests, social: me.social, is_admin: admin };
+      cards[uid] = { ...cards[uid], id: uid, display_name: dn(me), avatar: me.avatar, theme: me.theme, bio: me.bio, interests: me.interests, social: me.social, username: me.username, is_admin: admin };
       paintMe(); buildProfile();
     };
     v.querySelector('#avfile').addEventListener('change', async e => {
