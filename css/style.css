@@ -345,7 +345,11 @@ label.btn{display:block;text-align:center}
 .pf[hidden]{display:none}
 .hero{position:relative;isolation:isolate;overflow:hidden;display:grid;justify-items:center;gap:.35rem;text-align:center;padding:2.4rem 1.2rem 1.6rem;color:#fff}
 .hero-bg{position:absolute;inset:0;z-index:-1;background:linear-gradient(120deg,color-mix(in srgb,var(--tc) 78%,#000),color-mix(in srgb,var(--tc) 60%,#fff),color-mix(in srgb,var(--tc) 70%,#7C4DFF),color-mix(in srgb,var(--tc) 78%,#000));background-size:300% 300%;animation:bgshift 12s ease-in-out infinite alternate}
-.hero-bg i{position:absolute;border-radius:50%;background:#fff;filter:blur(40px);opacity:.4;animation:drift2 10s ease-in-out infinite alternate}
+.hero-bg.has-banner{background:linear-gradient(120deg,rgba(5,15,32,.48),rgba(10,27,51,.28),rgba(5,15,32,.55))}
+.hero-banner{position:absolute;z-index:0;inset:0;width:100%;height:100%;object-fit:cover;transition:filter .25s,transform .25s}
+.hero-banner.is-blurred{filter:blur(8px);transform:scale(1.06)}
+.hero-bg.has-banner::after{content:"";position:absolute;z-index:1;inset:0;background:linear-gradient(180deg,rgba(5,15,32,.2),rgba(5,15,32,.48))}
+.hero-bg i{position:absolute;z-index:2;border-radius:50%;background:#fff;filter:blur(40px);opacity:.4;animation:drift2 10s ease-in-out infinite alternate}
 .hero-bg i:nth-child(1){width:190px;height:190px;left:-50px;top:-70px}
 .hero-bg i:nth-child(2){width:230px;height:230px;right:-70px;bottom:-100px;background:var(--tc);opacity:.7;animation-delay:-4s}
 .hero-bg i:nth-child(3){width:120px;height:120px;left:60%;top:8%;opacity:.28;animation-delay:-7s}
@@ -358,6 +362,12 @@ label.btn{display:block;text-align:center}
 .pf-av{position:relative;cursor:pointer;display:inline-grid}
 .pf-av .cam{right:12px;bottom:10px}
 .pf-av .av.xl{box-shadow:none}
+.pf-banner-edit{position:absolute;z-index:3;top:1rem;right:1rem;display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border:1px solid rgba(255,255,255,.52);border-radius:999px;background:rgba(255,255,255,.2);color:#fff;font-size:.72rem;font-weight:600;cursor:pointer;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:background .2s,transform .18s var(--ease)}
+.pf-banner-edit:hover{background:rgba(255,255,255,.32);transform:translateY(-1px)}
+.pf-banner-settings{display:grid;gap:.35rem;padding:.8rem 1rem;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.42)}
+.pf-banner-settings>small{font-size:.72rem;color:var(--muted);font-weight:400}
+.pf-blur-control{display:flex!important;align-items:center;gap:.55rem!important;color:var(--ink)!important}
+.pf-blur-control input{width:17px;height:17px;accent-color:var(--tc)}
 
 /* moldura com anéis girando em loop */
 .halo{--hc:var(--tc);--hc2:#fff;position:relative;display:inline-grid;place-items:center;padding:16px}

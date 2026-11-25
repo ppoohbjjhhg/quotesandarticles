@@ -20,6 +20,7 @@ const DB = (() => {
   const likes = () => json('/rest/v1/likes?select=post_id,user_id&order=created_at.asc');
   const comments = () => json('/rest/v1/comments?select=*&order=created_at.asc');
   const cards = () => json('/rest/v1/profile_cards?select=*');
+  const profileBanners = () => json('/rest/v1/profile_banners?select=id,banner,banner_blur,bio_long');
   const publicationCounts = () => json('/rest/v1/publication_counts?select=user_id,total');
   const profile = async () => (await one('/rest/v1/profile?select=avatar,admin_id&id=eq.1')) || {};
   // dados da própria conta
@@ -34,9 +35,9 @@ const DB = (() => {
   const delComment = id => req(`/rest/v1/comments?id=eq.${q(id)}`, { method: 'DELETE', auth: true });
 
   // Imagens: admin na raiz; leitores na própria pasta.
-  async function upload(dataUrl, folder = '') {
+  async function upload(dataUrl, folder = '', contentType = '') {
     const blob = await (await fetch(dataUrl)).blob();
-    const gif = blob.type === 'image/gif';
+    const gif = contentType === 'image/gif' || blob.type === 'image/gif';
     const name = `${folder ? folder + '/' : ''}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${gif ? 'gif' : 'jpg'}`;
     await req(`/storage/v1/object/images/${name}`, { method: 'POST', body: blob, auth: true, ct: gif ? 'image/gif' : 'image/jpeg' });
     return `${C().SUPABASE_URL}/storage/v1/object/public/images/${name}`;
@@ -57,5 +58,5 @@ const DB = (() => {
   async function remove(p) { await req(`/rest/v1/posts?id=eq.${q(p.id)}`, { method: 'DELETE', auth: true }); imgs(p).forEach(deleteImage); }
   const setAvatar = url => req('/rest/v1/profile', { method: 'POST', body: { id: 1, avatar: url }, auth: true, prefer: 'resolution=merge-duplicates,return=minimal' });
 
-  return { imgs, list, likes, comments, cards, publicationCounts, profile, myProfile, saveProfile, saves, save, unsave, like, unlike, addComment, delComment, upload, deleteImage, add, update, remove, setAvatar };
+  return { imgs, list, likes, comments, cards, profileBanners, publicationCounts, profile, myProfile, saveProfile, saves, save, unsave, like, unlike, addComment, delComment, upload, deleteImage, add, update, remove, setAvatar };
 })();

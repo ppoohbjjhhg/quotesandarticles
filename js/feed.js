@@ -95,11 +95,14 @@
   }
   async function refreshSocial() {   // traz curtidas, comentários e perfis novos
     try {
-      const [ls, cs, cd] = await Promise.all([DB.likes(), DB.comments(), DB.cards()]);
+      const [ls, cs, cd, banners] = await Promise.all([
+        DB.likes(), DB.comments(), DB.cards(), DB.profileBanners().catch(() => [])
+      ]);
       likes = {}; comments = {};
       ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.user_id));
       cs.forEach(c => (comments[c.post_id] = comments[c.post_id] || []).push(c));
       cd.forEach(c => { cards[c.id] = c; });
+      banners.forEach(b => { cards[b.id] = { ...cards[b.id], ...b, bio: b.bio_long ?? cards[b.id]?.bio }; });
       computeStats();
     } catch {}
   }
@@ -764,12 +767,13 @@
   const halo = c => `<div class="halo lv-${c.is_admin ? 'ceo' : levelOf(c.id).k}"><span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>${c.is_admin ? `<span class="crown">${UI.icon('crown', 26)}</span>` : ''}${av(c, 'xl', false)}</div>`;
   function hero(c, o = {}) {
     const ceo = !!c.is_admin;
-    return `<div class="hero"><div class="hero-bg"><i></i><i></i><i></i></div>
+    return `<div class="hero"><div class="hero-bg${c.banner ? ' has-banner' : ''}">${c.banner ? `<img class="hero-banner${c.banner_blur ? ' is-blurred' : ''}" src="${esc(c.banner)}" alt="">` : ''}<i></i><i></i><i></i></div>
       ${o.back ? '<button type="button" class="hero-back" id="back">← Voltar</button>' : ''}
       ${o.edit ? `<label class="pf-av" for="avfile" title="Trocar foto">${halo(c)}<span class="cam">${UI.icon('image', 16)}</span></label><input id="avfile" type="file" accept="image/*" hidden>` : halo(c)}
+      ${o.edit ? `<label class="pf-banner-edit" for="bannerfile">${UI.icon('image', 14)} Alterar banner</label><input id="bannerfile" type="file" accept="image/*" hidden>` : ''}
       <h2>${esc(c.display_name)} ${ceo ? ceoBadge() : lvlBadge(c.id, true)}</h2>
       <p class="hero-u">@${esc(c.username || '')}${ceo ? ' · CEO e fundador' : ''}</p>
-      ${c.bio ? `<p class="pf-bio">${esc(c.bio)}</p>` : ''}</div>`;
+      ${(c.bio_long ?? c.bio) ? `<p class="pf-bio">${esc(c.bio_long ?? c.bio)}</p>` : ''}</div>`;
   }
   const st2 = (ic, n, label) => `<div class="st2"><span class="ic">${UI.icon(ic, 18)}</span><b data-count="${n}">0</b><small>${label}</small></div>`;
   function publicationRewards(u) {
@@ -823,16 +827,21 @@
     const handle = (me.social || '').split('/').filter(Boolean).pop() || '';
     const nameLocked = me.name_changes >= 1, c = myCard(), st = stats[uid] || { likes: 0, comments: 0, total: 0 };
     v.style.setProperty('--tc', THEMES[pf.theme]);
-    v.innerHTML = hero({ ...c, bio: me.bio, username: me.username }, { edit: true }) + `<div class="pf-body">
+    const profileBio = me.bio_long ?? me.bio ?? '';
+    v.innerHTML = hero({ ...c, bio: profileBio, username: me.username }, { edit: true }) + `<div class="pf-body">
       <div class="st-grid">${admin ? st2('file', posts.length, 'Publicações') + st2('heart', received(), 'Curtidas recebidas') + st2('user', readersCount(), 'Leitores')
         : st2('heart', st.likes, 'Curtidas') + st2('chat', st.comments, 'Comentários') + st2('trophy', st.total, 'Interações')}</div>
       ${admin ? '' : levelBox(uid)}
       ${admin ? '' : publicationRewards(uid)}
       <form id="pfForm" class="pf-form">
+        <div class="pf-banner-settings full">
+          <label class="pf-blur-control"><input id="fBannerBlur" type="checkbox"${me.banner_blur ? ' checked' : ''}> Aplicar desfoque ao banner</label>
+          <small>Use uma imagem ou GIF de até 6 MB clicando em “Alterar banner” no topo do perfil.</small>
+        </div>
         <label>Nome<input class="input" id="fName" maxlength="30" value="${esc(me.name)}" ${nameLocked ? 'disabled' : ''}><small>${nameLocked ? 'Você já usou a alteração de nome.' : 'Você pode alterar o nome apenas mais 1 vez.'}</small></label>
         <label>Nome social<input class="input" id="fSocialName" maxlength="30" value="${esc(me.social_name || '')}" placeholder="Opcional"><small>Aparece no lugar do nome nos comentários, curtidas e perfil.</small></label>
         <label>Idade<input class="input" id="fAge" type="number" min="5" max="120" value="${me.age ?? ''}"><small>Fica privada: só você vê.</small></label>
-        <label>Bio<input class="input" id="fBio" maxlength="25" value="${esc(me.bio || '')}" placeholder="Até 25 caracteres"><small id="bioN">${(me.bio || '').length}/25</small></label>
+        <label>Bio<input class="input" id="fBio" maxlength="120" value="${esc(profileBio)}" placeholder="Conte um pouco sobre você"><small id="bioN">${profileBio.length}/120 caracteres</small></label>
         <label class="full">Rede social<span class="row"><select class="sel-i" id="fNet"><option value="instagram"${net === 'instagram' ? ' selected' : ''}>Instagram</option><option value="x"${net === 'x' ? ' selected' : ''}>X</option></select><input class="input" id="fHandle" maxlength="31" value="${esc(handle)}" placeholder="@usuario"></span></label>
         <div class="lbl full">Cor do perfil<div class="swatches" id="fTheme">${Object.entries(THEMES).map(([k, col]) => `<button type="button" class="sw${k === pf.theme ? ' on' : ''}" data-t="${k}" title="${k}" aria-label="${k}" style="background:${col}"></button>`).join('')}</div></div>
         <div class="lbl full">Interesses de leitura <small id="intN">${pf.topics.size}/15</small><div class="topics" id="fTopics">${TOPICS.map(t => `<button type="button" class="topic${pf.topics.has(t) ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
@@ -840,7 +849,10 @@
       </form></div>`;
     countUp(v);
     const val = id => v.querySelector(id).value.trim();
-    v.querySelector('#fBio').addEventListener('input', e => { v.querySelector('#bioN').textContent = `${e.target.value.length}/25`; });
+    v.querySelector('#fBio').addEventListener('input', e => { v.querySelector('#bioN').textContent = `${e.target.value.length}/120 caracteres`; });
+    v.querySelector('#fBannerBlur').addEventListener('change', e => {
+      v.querySelector('.hero-banner')?.classList.toggle('is-blurred', e.target.checked);
+    });
     v.querySelector('#fTheme').addEventListener('click', e => {
       const s = e.target.closest('.sw'); if (!s) return;
       pf.theme = s.dataset.t; v.style.setProperty('--tc', THEMES[pf.theme]);
@@ -852,7 +864,11 @@
       t.classList.toggle('on'); v.querySelector('#intN').textContent = `${pf.topics.size}/15`;
     });
     const sync = () => {
-      cards[uid] = { ...cards[uid], id: uid, display_name: dn(me), avatar: me.avatar, theme: me.theme, bio: me.bio, interests: me.interests, social: me.social, username: me.username, is_admin: admin };
+      cards[uid] = {
+        ...cards[uid], id: uid, display_name: dn(me), avatar: me.avatar, banner: me.banner,
+        banner_blur: me.banner_blur, theme: me.theme, bio: me.bio_long ?? me.bio, interests: me.interests,
+        social: me.social, username: me.username, is_admin: admin
+      };
       paintMe(); buildProfile();
     };
     v.querySelector('#avfile').addEventListener('change', async e => {
@@ -863,11 +879,33 @@
         sync(); UI.toast('Foto atualizada');
       } catch { UI.toast('Não foi possível trocar a foto. Confira o SQL v4.'); }
     });
+    v.querySelector('#bannerfile').addEventListener('change', async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      if (!f.type.startsWith('image/')) return UI.toast('Escolha um arquivo de imagem.');
+      const gif = f.type === 'image/gif' || /\.gif$/i.test(f.name);
+      if (gif && f.size > GIF_MAX) return UI.toast('GIF muito grande (máximo 6 MB).');
+      const submit = v.querySelector('#pfForm button[type="submit"]');
+      submit.disabled = true;
+      try {
+        const imageData = gif ? await readFile(f) : await shrink(f, 1800, false);
+        const url = await DB.upload(imageData, uid, gif ? 'image/gif' : ''), old = me.banner;
+        const updated = await DB.saveProfile(uid, { banner: url });
+        if (!updated) throw new Error('O perfil não foi atualizado.');
+        me = updated;
+        if (old) DB.deleteImage(old);
+        sync(); UI.toast('Banner atualizado');
+      } catch {
+        UI.toast('Não foi possível salvar o banner. Confira se a migração SQL v6 foi executada.');
+      } finally {
+        if (v.isConnected) v.querySelector('#pfForm button[type="submit"]').disabled = false;
+      }
+    });
     v.querySelector('#pfForm').addEventListener('submit', async e => {
       e.preventDefault();
       const h = val('#fHandle').replace(/^@/, '').replace(/[^A-Za-z0-9_.]/g, '').slice(0, 30);
       const patch = {
-        social_name: val('#fSocialName') || null, age: val('#fAge') ? +val('#fAge') : null, bio: val('#fBio') || null,
+        social_name: val('#fSocialName') || null, age: val('#fAge') ? +val('#fAge') : null, bio_long: val('#fBio') || null,
+        banner_blur: v.querySelector('#fBannerBlur').checked,
         theme: pf.theme, interests: [...pf.topics],
         social: h ? (v.querySelector('#fNet').value === 'x' ? `https://x.com/${h}` : `https://instagram.com/${h}`) : null
       };
@@ -992,10 +1030,12 @@
         DB.list(), DB.likes().catch(() => []), DB.comments().catch(() => []), DB.cards().catch(() => []),
         DB.publicationCounts().catch(() => null)
       ]);
+      const banners = await DB.profileBanners().catch(() => []);
       posts = ps;
       ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.user_id));
       cs.forEach(c => (comments[c.post_id] = comments[c.post_id] || []).push(c));
       cd.forEach(c => { cards[c.id] = c; });
+      banners.forEach(b => { cards[b.id] = { ...cards[b.id], ...b, bio: b.bio_long ?? cards[b.id]?.bio }; });
       if (pc) pc.forEach(c => { publicationCounts[c.user_id] = c.total; });
       else UI.toast('Os selos não carregaram. Verifique a conexão e execute o SQL v5 no Supabase, se ainda não fez isso.');
       computeStats();
