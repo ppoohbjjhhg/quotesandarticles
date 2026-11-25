@@ -28,7 +28,7 @@ const UI = (() => {
 
   // animação de clique (ripple)
   document.addEventListener('pointerdown', e => {
-    const b = e.target.closest('.btn,.tab,.nav-link,.icon-btn,.chip');
+    const b = e.target.closest('.btn,.tab,.nav-link,.icon-btn,.chip,.lg-btn');
     if (!b) return;
     const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height) * 2;
     const el = document.createElement('span');

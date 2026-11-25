@@ -6,53 +6,60 @@
 <title>Entrar · Acervo</title>
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Newsreader:ital,wght@1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/login.css">
 </head>
-<body>
-<div class="orb a"></div><div class="orb b"></div>
-<main class="auth-wrap">
-  <section class="auth-card glass" id="card">
-    <div class="mark" aria-hidden="true">“</div>
-    <h1>Quotes and Articles</h1>
-    <p class="sub">Quotes, notas, estudos e artigos.</p>
+<body class="lg">
+<div class="lg-photo" aria-hidden="true"></div>
+<div class="lg-shade" aria-hidden="true"></div>
 
-    <div class="seg" id="seg" data-i="0" role="tablist">
-      <button type="button" role="tab" aria-selected="true">Entrar</button>
-      <button type="button" role="tab" aria-selected="false">Criar conta</button>
-      <button type="button" role="tab" aria-selected="false">Admin</button>
-    </div>
+<main class="lg-wrap">
+  <section class="lg-card" id="card">
+    <header class="lg-top">
+      <span>Quotes and Articles</span>
+      <button type="button" class="lg-link plain" id="guest">Continuar sem conta</button>
+    </header>
 
-    <form id="readerForm" class="pane">
-      <label for="ruser">Usuário</label>
-      <input id="ruser" class="input" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="seu_usuario">
-      <label for="rpass">Senha</label>
-      <input id="rpass" class="input" type="password" required autocomplete="current-password" placeholder="Sua senha">
-      <p class="err" id="rerr" role="alert"></p>
-      <button class="btn btn-primary" type="submit">Entrar</button>
+    <!-- Entrar -->
+    <form id="readerForm" class="lg-form">
+      <h1>Entrar</h1>
+      <p class="lg-sub">Bem-vindo de volta. Entre na sua conta.</p>
+      <input id="ruser" class="lg-in" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="Usuário" aria-label="Usuário">
+      <input id="rpass" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha" aria-label="Senha">
+      <div class="lg-row">
+        <label class="lg-check"><input type="checkbox" id="remember" checked><span></span>Lembrar de mim</label>
+        <button type="button" class="lg-link" id="forgot">Esqueci a senha</button>
+      </div>
+      <p class="lg-err" id="rerr" role="alert"></p>
+      <button class="lg-btn" type="submit">Entrar</button>
+      <p class="lg-alt">Não tem conta? <button type="button" class="lg-link" data-go="1">Criar conta</button></p>
     </form>
 
-    <form id="signForm" class="pane" hidden>
-      <label for="sname">Seu nome</label>
-      <input id="sname" class="input" required maxlength="30" autocomplete="name" placeholder="Como quer ser chamado">
-      <label for="suser">Usuário (para entrar)</label>
-      <input id="suser" class="input" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="letras, números e _">
-      <label for="spass">Senha</label>
-      <input id="spass" class="input" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
-      <p class="err" id="serr" role="alert"></p>
-      <button class="btn btn-primary" type="submit">Criar conta</button>
+    <!-- Criar conta -->
+    <form id="signForm" class="lg-form" hidden>
+      <h1>Criar conta</h1>
+      <p class="lg-sub">Crie sua conta para curtir, salvar e comentar.</p>
+      <input id="suser" class="lg-in" required minlength="3" maxlength="20" autocomplete="username" autocapitalize="none" placeholder="Usuário (apenas letras)" aria-label="Usuário">
+      <input id="sname" class="lg-in" required maxlength="30" autocomplete="nickname" placeholder="Nome social (como quer aparecer)" aria-label="Nome social">
+      <input id="spass" class="lg-in" type="password" required minlength="5" maxlength="5" autocomplete="new-password" placeholder="Senha (5 letras ou números)" aria-label="Senha">
+      <p class="lg-err" id="serr" role="alert"></p>
+      <button class="lg-btn" type="submit">Criar conta</button>
+      <p class="lg-alt">Já tem conta? <button type="button" class="lg-link" data-go="0">Entrar</button></p>
     </form>
 
-    <form id="adminForm" class="pane" hidden>
-      <label for="pw">Senha de administrador</label>
-      <input id="pw" class="input" type="password" autocomplete="current-password" placeholder="Digite a senha" required>
-      <p class="err" id="err" role="alert"></p>
-      <button class="btn btn-primary" type="submit">Entrar como administrador</button>
+    <!-- Administrador -->
+    <form id="adminForm" class="lg-form" hidden>
+      <h1>Administrador</h1>
+      <p class="lg-sub">Acesso restrito ao CEO do acervo.</p>
+      <input id="pw" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha de administrador" aria-label="Senha de administrador">
+      <p class="lg-err" id="err" role="alert"></p>
+      <button class="lg-btn" type="submit">Entrar</button>
+      <p class="lg-alt"><button type="button" class="lg-link" data-go="0">← Voltar</button></p>
     </form>
-
-   
-    <p class="credit">by Pedro Henrique Frutuoso</p>
   </section>
+
+  <footer class="lg-foot">by Pedro Henrique Frutuoso · <button type="button" class="lg-link" id="toAdmin">Administrador</button></footer>
 </main>
 <script src="../js/config.js"></script>
 <script src="../js/ui.js"></script>

@@ -1,15 +1,19 @@
 /* Sessão: visitante (só leitura), leitor (usuário + senha) e administrador. Tudo autenticado no Supabase. */
 const Auth = (() => {
   const KEY = 'acervo_session', C = () => window.CONFIG;
-  const session = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
-  const save = o => localStorage.setItem(KEY, JSON.stringify(o));
-  const logout = () => { localStorage.removeItem(KEY); location.replace('login.html'); };
+  let remember = true;   // "Lembrar de mim": guarda no navegador; senão, só até fechar a aba
+  const setRemember = v => { remember = !!v; };
+  const raw = () => localStorage.getItem(KEY) || sessionStorage.getItem(KEY);
+  const session = () => { try { return JSON.parse(raw()); } catch { return null; } };
+  const save = o => (sessionStorage.getItem(KEY) ? sessionStorage : localStorage).setItem(KEY, JSON.stringify(o));
+  const create = o => { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); (remember ? localStorage : sessionStorage).setItem(KEY, JSON.stringify(o)); };
+  const logout = () => { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); location.replace('login.html'); };
   // o Supabase exige e-mail: montamos um interno a partir do usuário (o leitor nunca vê isso)
   const mail = u => `${u.toLowerCase()}.acervo@${C().READER_DOMAIN || 'gmail.com'}`;
   const post = (path, body) => fetch(`${C().SUPABASE_URL}/auth/v1/${path}`, {
     method: 'POST', headers: { apikey: C().SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
-  const keep = (role, d) => save({ role, uid: d.user.id, token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
+  const keep = (role, d) => create({ role, uid: d.user.id, token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
 
   async function signIn(role, email, pw) {
     const r = await post('token?grant_type=password', { email, password: pw });
@@ -37,7 +41,7 @@ const Auth = (() => {
     keep('reader', j);
     return 'ok';
   }
-  const guest = () => save({ role: 'guest', name: 'Visitante' });
+  const guest = () => create({ role: 'guest', name: 'Visitante' });
 
   // token válido (renova sozinho quando expira)
   async function token() {
@@ -50,5 +54,5 @@ const Auth = (() => {
     save({ ...s, token: d.access_token, refresh: d.refresh_token, exp: Date.now() + d.expires_in * 1000 });
     return d.access_token;
   }
-  return { session, loginAdmin, loginReader, signup, guest, logout, token };
+  return { session, loginAdmin, loginReader, signup, guest, logout, token, setRemember };
 })();
