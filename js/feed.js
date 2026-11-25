@@ -445,6 +445,9 @@
         ? 'Compartilhar card com GIF animado'
         : `Compartilhar card ${settings.ratio === 'vertical' ? 'vertical' : 'horizontal'}`;
     });
+    if (sharingMedia?.gif) {
+      document.querySelector('[data-share-target="instagram"] small').textContent = 'Baixar vídeo e adicionar pelo Instagram';
+    }
     if (sharingMedia?.loading) { $('#shareStatus').textContent = 'Carregando a mídia do post…'; return; }
     if (sharingMedia?.gif) {
       if (!sharingMedia.image) { $('#shareStatus').textContent = 'Não foi possível carregar o GIF para criar o card animado.'; return; }
@@ -603,6 +606,11 @@
       window.open(intent.href, '_blank', 'noopener,noreferrer');
     } else if (button.dataset.shareTarget === 'wa-message') {
       window.open(`https://wa.me/?text=${encodeURIComponent(`${caption}\nLeia no Acervo: ${sharingUrl}`)}`, '_blank', 'noopener,noreferrer');
+    } else if (button.dataset.shareTarget === 'instagram' && sharingFile?.type.startsWith('video/')) {
+      downloadShareFile();
+      $('#shareStatus').textContent = sharingFile.name.endsWith('.mp4')
+        ? 'Vídeo baixado. No Instagram, crie um Story e importe o MP4 da galeria. No iPhone, salve-o primeiro em Fotos. Adicione o link do post pelo adesivo de link.'
+        : 'Vídeo WebM baixado. O Instagram pode não aceitá-lo; para melhor compatibilidade, use um navegador que gere MP4 e importe o arquivo pela galeria.';
     } else {
       await shareStory();
     }
