@@ -405,7 +405,6 @@ label.btn{display:block;text-align:center}
 .share-media[hidden]{display:none}
 .share-media img{width:100%;height:100%;object-fit:cover;display:block}
 .share-media::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.15),transparent 38%,rgba(5,16,30,.2));pointer-events:none}
-.share-media span{position:absolute;z-index:1;left:.55rem;bottom:.55rem;padding:.22rem .45rem;border:1px solid rgba(255,255,255,.4);border-radius:999px;background:rgba(7,18,34,.48);color:#fff;font-size:.46rem;font-weight:700;letter-spacing:.06em;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .share-copy{display:grid;gap:.45rem;padding:.7rem .75rem;border:1px solid rgba(255,255,255,.56);border-radius:16px;background:rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 10px 24px -20px rgba(0,0,0,.7);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%)}
 .share-copy h3{font-size:.95rem;line-height:1.3;color:var(--share-fg)}
 .share-copy blockquote{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:4;font:italic .92rem/1.45 var(--share-font);overflow-wrap:anywhere;color:var(--share-fg)}

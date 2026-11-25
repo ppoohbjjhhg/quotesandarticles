@@ -192,6 +192,7 @@
     mono: { css: "'JetBrains Mono', monospace", canvas: 'monospace' }
   };
   let sharingPost = null, sharingFile = null, sharingMedia = null, sharingUrl = '', shareGeneration = 0;
+  let shareRecorder = null, shareAnimationFrame = 0;
   const shareSettings = () => ({
     ratio: $('#shareRatio').value,
     font: $('#shareFont').value,
@@ -272,13 +273,10 @@
     ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${font}`;
     drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', x, y, width, 52, maxLines);
   }
-  async function loadShareMedia(url, postId) {
+  async function loadShareMedia(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Mídia indisponível (${response.status})`);
     const blob = await response.blob(), gif = isGif(url) || blob.type === 'image/gif';
-    const type = gif ? 'image/gif' : (blob.type || 'image/jpeg');
-    const file = new File([blob], `acervo-${postId}.${gif ? 'gif' : 'jpg'}`, { type });
-    if (gif) return { url, gif, file, image: null };
     const objectUrl = URL.createObjectURL(blob);
     try {
       const image = await new Promise((resolve, reject) => {
@@ -287,18 +285,29 @@
         element.onerror = () => reject(new Error('Imagem inválida'));
         element.src = objectUrl;
       });
-      return { url, gif, file, image };
-    } finally { URL.revokeObjectURL(objectUrl); }
+      if (gif) return { url, gif, image, objectUrl };
+      URL.revokeObjectURL(objectUrl);
+      return { url, gif, image };
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
   }
-  async function makeShareImage(p, author, url, settings, mediaImage) {
-    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas indisponível');
+  function createShareCanvas(settings) {
+    const canvas = document.createElement('canvas');
     const vertical = settings.ratio === 'vertical';
     canvas.width = vertical ? 1080 : 1920; canvas.height = vertical ? 1920 : 1080;
-    const w = canvas.width, h = canvas.height, margin = vertical ? 80 : 90;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas indisponível');
+    return { canvas, ctx };
+  }
+  function drawShareCard(ctx, p, author, url, settings, mediaImage) {
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    const vertical = settings.ratio === 'vertical';
+    const margin = vertical ? 80 : 90;
     const bg = ctx.createLinearGradient(0, 0, w, h);
     bg.addColorStop(0, settings.bg); bg.addColorStop(.55, settings.accent); bg.addColorStop(1, settings.bg);
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(w * .92, h * .12, vertical ? 330 : 460, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.beginPath(); ctx.arc(w * .12, h * .84, vertical ? 380 : 420, 0, Math.PI * 2); ctx.fill();
     const brandY = vertical ? 130 : 115;
@@ -332,31 +341,129 @@
       ctx.fillStyle = settings.accent; ctx.font = '18px Arial, sans-serif';
       drawWrapped(ctx, url, margin + 34, 990, w - margin * 2 - 68, 24, 1);
     }
+  }
+  async function makeShareImage(p, author, url, settings, mediaImage) {
+    const { canvas, ctx } = createShareCanvas(settings);
+    drawShareCard(ctx, p, author, url, settings, mediaImage);
     const blob = await new Promise((resolve, reject) => canvas.toBlob(
       value => value ? resolve(value) : reject(new Error('Não foi possível criar o card')),
       'image/png'
     ));
-    return new File([blob], `acervo-${p.id}.${vertical ? 'vertical' : 'horizontal'}.png`, { type: 'image/png' });
+    const orientation = settings.ratio === 'vertical' ? 'vertical' : 'horizontal';
+    return new File([blob], `acervo-${p.id}.${orientation}.png`, { type: 'image/png' });
+  }
+  function getShareVideoType() {
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return null;
+    const formats = [
+      { mime: 'video/mp4;codecs=avc1.42E01E', extension: 'mp4' },
+      { mime: 'video/mp4', extension: 'mp4' },
+      { mime: 'video/webm;codecs=vp9', extension: 'webm' },
+      { mime: 'video/webm;codecs=vp8', extension: 'webm' },
+      { mime: 'video/webm', extension: 'webm' }
+    ];
+    return formats.find(format => MediaRecorder.isTypeSupported(format.mime)) || null;
+  }
+  async function makeAnimatedShareVideo(p, author, url, settings, mediaImage) {
+    if (typeof HTMLCanvasElement.prototype.captureStream !== 'function') {
+      throw new Error('Este navegador não permite criar o vídeo animado do card.');
+    }
+    const format = getShareVideoType();
+    if (!format) throw new Error('Este navegador não oferece um formato de vídeo compatível para compartilhar o GIF animado.');
+    const { canvas, ctx } = createShareCanvas(settings);
+    const stream = canvas.captureStream(24);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: format.mime, videoBitsPerSecond: 4000000 });
+    } catch (error) {
+      stream.getTracks().forEach(track => track.stop());
+      throw error;
+    }
+    drawShareCard(ctx, p, author, url, settings, mediaImage);
+    shareRecorder = recorder;
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      recorder.addEventListener('dataavailable', event => {
+        if (event.data?.size) chunks.push(event.data);
+      });
+      recorder.addEventListener('error', event => {
+        stream.getTracks().forEach(track => track.stop());
+        if (shareRecorder === recorder) {
+          if (shareAnimationFrame) cancelAnimationFrame(shareAnimationFrame);
+          shareAnimationFrame = 0;
+          shareRecorder = null;
+        }
+        reject(event.error || new Error('Não foi possível gravar o card animado.'));
+      }, { once: true });
+      recorder.addEventListener('stop', () => {
+        stream.getTracks().forEach(track => track.stop());
+        if (shareRecorder === recorder) {
+          if (shareAnimationFrame) cancelAnimationFrame(shareAnimationFrame);
+          shareAnimationFrame = 0;
+          shareRecorder = null;
+        }
+        const blob = new Blob(chunks, { type: recorder.mimeType || format.mime });
+        if (!blob.size) {
+          reject(new Error('O navegador não conseguiu gerar o vídeo animado.'));
+          return;
+        }
+        resolve(new File([blob], `acervo-${p.id}-animado.${format.extension}`, {
+          type: recorder.mimeType || format.mime
+        }));
+      }, { once: true });
+      try {
+        recorder.start(250);
+      } catch (error) {
+        stream.getTracks().forEach(track => track.stop());
+        if (shareRecorder === recorder) shareRecorder = null;
+        reject(error);
+        return;
+      }
+      const startedAt = performance.now();
+      const drawFrame = now => {
+        if (recorder.state !== 'recording') return;
+        drawShareCard(ctx, p, author, url, settings, mediaImage);
+        if (now - startedAt >= 5000) recorder.stop();
+        else shareAnimationFrame = requestAnimationFrame(drawFrame);
+      };
+      shareAnimationFrame = requestAnimationFrame(drawFrame);
+    });
+  }
+  function cancelShareRecording() {
+    if (shareAnimationFrame) cancelAnimationFrame(shareAnimationFrame);
+    shareAnimationFrame = 0;
+    if (shareRecorder?.state === 'recording') shareRecorder.stop();
   }
   async function refreshShareDesign() {
     const settings = applyShareSettings(), p = sharingPost, generation = ++shareGeneration;
+    cancelShareRecording();
     if (!p) return;
     sharingFile = null;
     $('#shareDownload').disabled = true;
     document.querySelectorAll('[data-file-share]').forEach(button => {
       button.disabled = true;
       button.querySelector('small').textContent = sharingMedia?.gif
-        ? 'Enviar o GIF animado original'
+        ? 'Compartilhar card com GIF animado'
         : `Compartilhar card ${settings.ratio === 'vertical' ? 'vertical' : 'horizontal'}`;
     });
     if (sharingMedia?.loading) { $('#shareStatus').textContent = 'Carregando a mídia do post…'; return; }
     if (sharingMedia?.gif) {
-      if (!sharingMedia.file) { $('#shareStatus').textContent = 'Não foi possível carregar o GIF original para compartilhar.'; return; }
-      sharingFile = sharingMedia.file;
-      $('#shareDownload').disabled = false;
-      $('#shareDownload').textContent = 'Baixar GIF animado original';
-      document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
-      $('#shareStatus').textContent = 'GIF original pronto: ele não será convertido em imagem estática. As opções de estilo aparecem na prévia.';
+      if (!sharingMedia.image) { $('#shareStatus').textContent = 'Não foi possível carregar o GIF para criar o card animado.'; return; }
+      $('#shareStatus').textContent = 'Preparando o card animado com o GIF. Isso pode levar alguns segundos…';
+      const author = p.author_id ? who(p.author_id) : adminCard();
+      try {
+        const file = await makeAnimatedShareVideo(p, author, sharingUrl, settings, sharingMedia.image);
+        if (generation !== shareGeneration || sharingPost !== p) return;
+        sharingFile = file;
+        $('#shareDownload').disabled = false;
+        $('#shareDownload').textContent = `Baixar card animado (${file.name.endsWith('.mp4') ? 'MP4' : 'WebM'})`;
+        document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
+        $('#shareStatus').textContent = file.type.includes('mp4')
+          ? 'Card animado pronto: o GIF está integrado ao layout e não será enviado como imagem estática.'
+          : 'Card animado pronto em WebM. O Instagram pode exigir MP4; se não aceitar, tente um navegador que gere MP4.';
+      } catch (error) {
+        if (generation !== shareGeneration || sharingPost !== p) return;
+        $('#shareStatus').textContent = error.message || 'Não foi possível preparar o card animado neste navegador.';
+      }
       return;
     }
     const author = p.author_id ? who(p.author_id) : adminCard();
@@ -376,6 +483,9 @@
     }
   }
   async function openShare(p) {
+    cancelShareRecording();
+    shareGeneration++;
+    if (sharingMedia?.objectUrl) URL.revokeObjectURL(sharingMedia.objectUrl);
     sharingPost = p; sharingFile = null; sharingUrl = postUrl(p.id); sharingMedia = null;
     const author = p.author_id ? who(p.author_id) : adminCard(), mediaUrl = DB.imgs(p)[0] || '';
     const gif = mediaUrl ? isGif(mediaUrl) : false;
@@ -389,14 +499,13 @@
     $('#sharePermalink').href = sharingUrl;
     $('#sharePermalink').textContent = sharingUrl;
     $('#shareMedia').hidden = !mediaUrl;
-    $('#shareGifNotice').hidden = !gif;
     $('#shareIntro').textContent = gif
-      ? 'O GIF será enviado como arquivo original para preservar a animação; proporção, fonte e cores personalizam apenas a prévia.'
+      ? 'O GIF será integrado ao card e exportado como vídeo animado. Personalize o formato, a fonte e as cores.'
       : 'Ajuste o formato, a fonte e as cores para criar seu card Liquid Glass.';
-    $('#shareDownload').textContent = gif ? 'Baixar GIF animado original' : 'Baixar card personalizado';
+    $('#shareDownload').textContent = gif ? 'Baixar card animado' : 'Baixar card personalizado';
     $('#shareDownload').disabled = true;
     document.querySelectorAll('[data-file-share] small').forEach(label => {
-      label.textContent = gif ? 'Enviar o GIF animado original' : 'Compartilhar o card personalizado';
+      label.textContent = gif ? 'Compartilhar card com GIF animado' : 'Compartilhar o card personalizado';
     });
     if (mediaUrl) {
       image.src = mediaUrl;
@@ -409,15 +518,18 @@
     $('#shareDialog').showModal();
     if (!mediaUrl) { await refreshShareDesign(); return; }
     $('#shareStatus').textContent = 'Carregando a mídia do post…';
-    try { sharingMedia = await loadShareMedia(mediaUrl, p.id); }
+    try { sharingMedia = await loadShareMedia(mediaUrl); }
     catch { sharingMedia = { url: mediaUrl, gif, loading: false, error: true, file: null, image: null }; }
     if (sharingPost === p) {
-      $('#shareGifNotice').hidden = !sharingMedia.gif;
+      if (sharingMedia.gif && sharingMedia.objectUrl) {
+        image.src = sharingMedia.objectUrl;
+        sharingMedia.image = image;
+      }
       $('#shareIntro').textContent = sharingMedia.gif
-        ? 'O GIF original será enviado sem conversão para preservar a animação; o estilo personalizado aparece apenas na prévia.'
+        ? 'O GIF será integrado ao card e exportado como vídeo animado. Personalize o formato, a fonte e as cores.'
         : 'A imagem do post será integrada ao card Liquid Glass.';
       document.querySelectorAll('[data-file-share] small').forEach(label => {
-        label.textContent = sharingMedia.gif ? 'Enviar o GIF animado original' : 'Compartilhar o card personalizado';
+        label.textContent = sharingMedia.gif ? 'Compartilhar card com GIF animado' : 'Compartilhar o card personalizado';
       });
       await refreshShareDesign();
     }
@@ -428,6 +540,14 @@
     link.href = objectUrl; link.download = sharingFile.name; link.click();
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
+  $('#shareDialog').addEventListener('close', () => {
+    cancelShareRecording();
+    shareGeneration++;
+    if (sharingMedia?.objectUrl) {
+      URL.revokeObjectURL(sharingMedia.objectUrl);
+      sharingMedia.objectUrl = null;
+    }
+  });
   async function shareStory() {
     if (!sharingFile) return;
     const p = sharingPost, author = p.author_id ? who(p.author_id) : adminCard();
@@ -435,8 +555,8 @@
     if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: data.files })) {
       try {
         await navigator.share(data);
-        $('#shareStatus').textContent = sharingMedia?.gif
-          ? 'GIF original enviado ao compartilhamento. A plataforma de destino controla a animação.'
+        $('#shareStatus').textContent = sharingFile.type.startsWith('video/')
+          ? 'Vídeo animado enviado ao menu de compartilhamento. Escolha Instagram Stories ou Status do WhatsApp.'
           : 'Compartilhamento aberto. Se necessário, adicione o link no próprio aplicativo.';
       } catch (error) {
         if (error.name === 'AbortError') { $('#shareStatus').textContent = 'Compartilhamento cancelado.'; return; }
@@ -462,7 +582,9 @@
   });
   $('#shareDownload').addEventListener('click', () => {
     downloadShareFile();
-    $('#shareStatus').textContent = sharingMedia?.gif ? 'GIF animado original baixado.' : 'Card personalizado baixado.';
+    $('#shareStatus').textContent = sharingFile?.type.startsWith('video/')
+      ? 'Card animado baixado.'
+      : 'Card personalizado baixado.';
   });
   $('#shareClose').addEventListener('click', () => $('#shareDialog').close());
   $('#shareDialog').addEventListener('click', e => { if (e.target === $('#shareDialog')) $('#shareDialog').close(); });
