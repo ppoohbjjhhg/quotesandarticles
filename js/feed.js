@@ -221,7 +221,7 @@
     const content = p.cat === 'artigo' && p.title ? `“${p.title}”` : `“${excerpt(p.text, 180) || 'uma publicação interessante'}”`;
     return `${author.display_name} publicou no Acervo:\n${content}`;
   };
-  function drawWrapped(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+  function wrappedLines(ctx, text, maxWidth, maxLines) {
     const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
     const lines = [];
     let line = '', index = 0;
@@ -238,8 +238,21 @@
       while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
       lines[lines.length - 1] = `${last}…`;
     }
+    return lines;
+  }
+  function drawWrapped(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    const lines = wrappedLines(ctx, text, maxWidth, maxLines);
     lines.forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
     return y + lines.length * lineHeight;
+  }
+  function measureShareCopy(ctx, p, settings, width, maxLines) {
+    let height = 0;
+    if (p.cat === 'artigo' && p.title) {
+      ctx.font = `700 42px ${SHARE_FONTS[settings.font].canvas}`;
+      height += wrappedLines(ctx, p.title, width, 2).length * 54 + 22;
+    }
+    ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${SHARE_FONTS[settings.font].canvas}`;
+    return height + wrappedLines(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', width, maxLines).length * 52;
   }
   function roundedRect(ctx, x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -271,7 +284,7 @@
     }
     ctx.fillStyle = settings.fg;
     ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${font}`;
-    drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', x, y, width, 52, maxLines);
+    return drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', x, y, width, 52, maxLines);
   }
   async function loadShareMedia(url) {
     const response = await fetch(url);
@@ -319,27 +332,35 @@
     ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), margin, vertical ? 270 : 220);
 
     if (vertical) {
-      const mediaY = 330, mediaH = 610, panelY = mediaImage ? 980 : 380, panelH = mediaImage ? 470 : 1060;
+      const mediaY = 330, mediaH = 610, panelY = mediaImage ? 980 : 380;
       if (mediaImage) drawCover(ctx, mediaImage, margin, mediaY, w - margin * 2, mediaH);
+      const copyX = margin + 42, copyY = panelY + 64, copyWidth = w - margin * 2 - 84;
+      const maxLines = mediaImage ? 5 : 12;
+      const panelH = mediaImage
+        ? 470
+        : Math.max(190, measureShareCopy(ctx, p, settings, copyWidth, maxLines) + 108);
       glassPanel(ctx, margin, panelY, w - margin * 2, panelH, 30);
-      drawShareCopy(ctx, p, settings, margin + 42, panelY + 78, w - margin * 2 - 84, mediaImage ? 5 : 12);
-      glassPanel(ctx, margin, 1540, w - margin * 2, 285, 28);
-      ctx.fillStyle = settings.fg; ctx.font = '600 18px Arial, sans-serif'; ctx.fillText('UMA IDEIA DE', margin + 40, 1605);
-      ctx.font = '700 30px Arial, sans-serif'; ctx.fillText(excerpt(author.display_name, 32), margin + 40, 1652);
-      ctx.fillStyle = settings.accent; ctx.font = '700 20px Arial, sans-serif'; ctx.fillText('CONTINUE LENDO NO ACERVO', margin + 40, 1710);
-      ctx.fillStyle = settings.fg; ctx.globalAlpha = .8; ctx.font = '18px Arial, sans-serif';
-      drawWrapped(ctx, url, margin + 40, 1750, w - margin * 2 - 80, 26, 2); ctx.globalAlpha = 1;
+      drawShareCopy(ctx, p, settings, copyX, copyY, copyWidth, maxLines);
+      const footerY = panelY + panelH + 42;
+      ctx.fillStyle = settings.fg; ctx.globalAlpha = .56; ctx.font = '16px Arial, sans-serif';
+      ctx.fillText(`por ${excerpt(author.display_name, 32)}`, margin + 40, footerY); ctx.globalAlpha = 1;
+      ctx.fillStyle = settings.accent; ctx.font = '700 18px Arial, sans-serif'; ctx.fillText('CONTINUE NO ACERVO', margin + 40, footerY + 38);
+      ctx.fillStyle = settings.fg; ctx.globalAlpha = .72; ctx.font = '16px Arial, sans-serif';
+      drawWrapped(ctx, url, margin + 40, footerY + 70, w - margin * 2 - 80, 24, 2); ctx.globalAlpha = 1;
     } else {
       const mediaX = margin, mediaY = 280, mediaW = 790, panelX = mediaImage ? 930 : margin;
       const panelW = mediaImage ? w - panelX - margin : w - margin * 2;
       if (mediaImage) drawCover(ctx, mediaImage, mediaX, mediaY, mediaW, 550);
-      glassPanel(ctx, panelX, mediaY, panelW, 550, 30);
-      drawShareCopy(ctx, p, settings, panelX + 42, mediaY + 82, panelW - 84, mediaImage ? 6 : 7);
-      glassPanel(ctx, margin, 900, w - margin * 2, 125, 24);
-      ctx.fillStyle = settings.fg; ctx.font = '700 23px Arial, sans-serif';
-      ctx.fillText(`${excerpt(author.display_name, 32)} · CONTINUE NO ACERVO`, margin + 34, 950);
-      ctx.fillStyle = settings.accent; ctx.font = '18px Arial, sans-serif';
-      drawWrapped(ctx, url, margin + 34, 990, w - margin * 2 - 68, 24, 1);
+      const copyX = panelX + 42, copyY = mediaY + 70, copyWidth = panelW - 84, maxLines = mediaImage ? 6 : 7;
+      const panelH = mediaImage ? 550 : Math.max(240, measureShareCopy(ctx, p, settings, copyWidth, maxLines) + 112);
+      glassPanel(ctx, panelX, mediaY, panelW, panelH, 30);
+      drawShareCopy(ctx, p, settings, copyX, copyY, copyWidth, maxLines);
+      const footerY = mediaY + panelH + 38;
+      ctx.fillStyle = settings.fg; ctx.globalAlpha = .56; ctx.font = '15px Arial, sans-serif';
+      ctx.fillText(`por ${excerpt(author.display_name, 32)}`, margin + 34, footerY); ctx.globalAlpha = 1;
+      ctx.fillStyle = settings.accent; ctx.font = '700 18px Arial, sans-serif'; ctx.fillText('CONTINUE NO ACERVO', margin + 34, footerY + 34);
+      ctx.fillStyle = settings.fg; ctx.globalAlpha = .72; ctx.font = '16px Arial, sans-serif';
+      drawWrapped(ctx, url, margin + 34, footerY + 64, w - margin * 2 - 68, 24, 2); ctx.globalAlpha = 1;
     }
   }
   async function makeShareImage(p, author, url, settings, mediaImage) {
