@@ -1,75 +1,375 @@
 /* Página de login: vidro líquido sobre foto (baseado na referência) */
-:root{--bg-blur:6px}   /* quanto de blur fica por cima da foto de fundo */
-body.lg{margin:0;min-height:100vh;font-family:'Montserrat',system-ui,sans-serif;color:#fff;background:#08140e;overflow-x:hidden}
-.lg *{box-sizing:border-box}
+:root {
+  --bg-blur: 6px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
-.lg-photo{position:fixed;inset:-6vmax;z-index:-2;background:url('../img/login-bg.jpg') center/cover no-repeat;filter:blur(var(--bg-blur)) saturate(1.05);animation:lgzoom 40s ease-in-out infinite alternate}
-@keyframes lgzoom{to{transform:scale(1.07) translate(-1%,-1%)}}
-.lg-shade{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(2,10,20,.28),rgba(2,10,20,.46))}
+html,
+body.lg {
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 
-.lg-wrap{min-height:100vh;display:grid;place-items:center;align-content:center;gap:1.2rem;padding:1.4rem 1rem 3rem}
+body.lg {
+  font-family: 'Montserrat', system-ui, sans-serif;
+  color: #fff;
+  background: #08140e;
+}
+
+.lg *,
+.lg *::before,
+.lg *::after {
+  box-sizing: border-box;
+}
+
+.lg-photo {
+  position: fixed;
+  inset: -6vmax;
+  z-index: -2;
+  background: url('../img/login-bg.jpg') center/cover no-repeat;
+  filter: blur(var(--bg-blur)) saturate(1.05);
+  animation: lgzoom 40s ease-in-out infinite alternate;
+}
+
+@keyframes lgzoom {
+  to {
+    transform: scale(1.07) translate(-1%, -1%);
+  }
+}
+
+.lg-shade {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(2, 10, 20, .28), rgba(2, 10, 20, .46));
+}
+
+.lg-wrap {
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  margin: 0;
+  padding: clamp(0.75rem, 2.5vh, 1.5rem) 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.65rem, 1.8vh, 1.15rem);
+  overflow: hidden;
+}
 
 /* cartão de vidro */
-.lg-card{position:relative;width:min(470px,100%);padding:1.35rem 2.2rem 1.9rem;border-radius:46px;color:#fff;
-  background:linear-gradient(145deg,rgba(255,255,255,.26),rgba(255,255,255,.07) 38%,rgba(255,255,255,.05) 62%,rgba(255,255,255,.2));
-  -webkit-backdrop-filter:blur(16px) saturate(170%) brightness(.78);backdrop-filter:blur(16px) saturate(170%) brightness(.78);
-  box-shadow:inset 0 1px 1px rgba(255,255,255,.7),inset 0 -1px 1px rgba(255,255,255,.35),inset 1px 0 1px rgba(255,255,255,.25),inset 0 0 38px rgba(255,255,255,.1),0 40px 80px -24px rgba(0,0,0,.65);
-  animation:lgin .8s var(--ease) both}
-@keyframes lgin{from{opacity:0;transform:translateY(22px) scale(.98)}}
-.lg-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.3px;pointer-events:none;
-  background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(255,255,255,.1) 30%,rgba(255,255,255,.05) 60%,rgba(255,255,255,.7));
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
-.lg-card::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;mix-blend-mode:screen;opacity:.75;
-  background:radial-gradient(150px 90px at var(--mx,25%) var(--my,0%),rgba(255,255,255,.34),transparent 70%)}
-.lg-card.leave{opacity:0;transform:scale(.97);transition:.35s var(--ease)}
-.lg-card.shake{animation:lgshake .4s}
-@keyframes lgshake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.lg-card {
+  position: relative;
+  width: min(470px, 100%);
+  max-height: calc(100dvh - 3.5rem);
+  padding: clamp(1.05rem, 2.4vh, 1.35rem) clamp(1.35rem, 5vw, 2.2rem) clamp(1.25rem, 2.8vh, 1.9rem);
+  border-radius: 46px;
+  color: #fff;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .26), rgba(255, 255, 255, .07) 38%, rgba(255, 255, 255, .05) 62%, rgba(255, 255, 255, .2));
+  -webkit-backdrop-filter: blur(16px) saturate(170%) brightness(.78);
+  backdrop-filter: blur(16px) saturate(170%) brightness(.78);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .7), inset 0 -1px 1px rgba(255, 255, 255, .35), inset 1px 0 1px rgba(255, 255, 255, .25), inset 0 0 38px rgba(255, 255, 255, .1), 0 40px 80px -24px rgba(0, 0, 0, .65);
+  animation: lgin .8s var(--ease) both;
+}
 
-.lg-top{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:2.3rem;font-size:.9rem;font-weight:500}
-.lg-top .lg-link{text-decoration:none}.lg-top .lg-link:hover{text-decoration:underline}
+@keyframes lgin {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(.98);
+  }
+}
 
-.lg-form{display:grid;gap:.6rem;animation:lgin .5s var(--ease) both}
-.lg-form[hidden]{display:none}
-.lg h1{margin:0;font-size:2.7rem;font-weight:500;line-height:1.1;letter-spacing:-.01em}
-.lg-sub{margin:.4rem 0 1.7rem;font-size:.97rem;font-weight:500}
+.lg-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.3px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .1) 30%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .7));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
 
-.lg-in{width:100%;height:58px;padding:0 1.1rem;border:0;border-radius:12px;color:#fff;font:500 1rem 'Montserrat',system-ui,sans-serif;
-  background:rgba(255,255,255,.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.28);transition:background .25s,box-shadow .25s}
-.lg-in::placeholder{color:rgba(255,255,255,.9)}
-.lg-in:hover{background:rgba(255,255,255,.27)}
-.lg-in:focus{outline:none;background:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 0 0 2px rgba(255,255,255,.75)}
-.lg-in:-webkit-autofill{-webkit-text-fill-color:#fff;transition:background-color 9999s}
+.lg-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: .75;
+  background: radial-gradient(150px 90px at var(--mx, 25%) var(--my, 0%), rgba(255, 255, 255, .34), transparent 70%);
+}
 
-.lg-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;font-size:.8rem;font-weight:500}
-.lg-check{position:relative;display:inline-flex;align-items:center;gap:.5rem;cursor:pointer}
-.lg-check input{position:absolute;opacity:0;width:0;height:0}
-.lg-check span{display:grid;place-items:center;width:15px;height:15px;border:1.3px solid #fff;transition:background .2s}
-.lg-check input:checked+span{background:#fff}
-.lg-check input:checked+span::after{content:"";width:8px;height:4px;border-left:2px solid #0a1b13;border-bottom:2px solid #0a1b13;transform:rotate(-45deg) translate(1px,-1px)}
-.lg-check input:focus-visible+span{outline:2px solid #fff;outline-offset:2px}
+.lg-card.leave {
+  opacity: 0;
+  transform: scale(.97);
+  transition: .35s var(--ease);
+}
 
-.lg-link{padding:0;border:0;background:none;color:#fff;font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.lg-link:hover{opacity:.85}
-.lg-link:focus-visible,.lg-btn:focus-visible{outline:2px solid #fff;outline-offset:3px;border-radius:6px}
+.lg-card.shake {
+  animation: lgshake .4s;
+}
 
-.lg-err{min-height:1.25em;margin:.1rem 0 0;font-size:.82rem;font-weight:600;color:#FFD3D3;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+@keyframes lgshake {
+  20%, 60% {
+    transform: translateX(-8px);
+  }
+  40%, 80% {
+    transform: translateX(8px);
+  }
+}
 
-.lg-btn{position:relative;overflow:hidden;display:block;min-width:226px;height:50px;margin:.9rem auto 0;padding:0 2rem;border:1px solid rgba(255,255,255,.8);border-radius:999px;background:transparent;color:#fff;font:600 1rem 'Montserrat',system-ui,sans-serif;cursor:pointer;transition:background .25s,transform .18s var(--ease),box-shadow .25s}
-.lg-btn:hover{background:rgba(255,255,255,.18);box-shadow:0 10px 24px -12px rgba(0,0,0,.6)}
-.lg-btn:active{transform:scale(.96)}
-.lg-alt{margin:1rem 0 0;text-align:center;font-size:.95rem;font-weight:500}
+.lg-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: clamp(1.1rem, 3.2vh, 2.3rem);
+  font-size: .9rem;
+  font-weight: 500;
+}
 
-.pwrap{position:relative;display:grid}
-.pwrap .lg-in{padding-right:3rem}
-.lg .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;background:none;color:rgba(255,255,255,.9);cursor:pointer;transition:background .2s}
-.lg .eye:hover{background:rgba(255,255,255,.18)}
+.lg-top .lg-link {
+  text-decoration: none;
+}
 
-.lg-foot{font-size:.78rem;font-weight:500;color:rgba(255,255,255,.8);text-shadow:0 1px 8px rgba(0,0,0,.5)}
-.lg-foot .lg-link{font-size:.78rem;color:rgba(255,255,255,.9)}
+.lg-top .lg-link:hover {
+  text-decoration: underline;
+}
 
-@media (max-width:480px){
-  .lg-card{padding:1.1rem 1.4rem 1.6rem;border-radius:38px}
-  .lg h1{font-size:2.2rem}.lg-top{margin-bottom:1.7rem}
+.lg-form {
+  display: grid;
+  gap: .55rem;
+  animation: lgin .5s var(--ease) both;
+}
+
+.lg-form[hidden] {
+  display: none;
+}
+
+.lg h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5.5vw, 2.7rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -.01em;
+}
+
+.lg-sub {
+  margin: .35rem 0 clamp(0.9rem, 2.5vh, 1.7rem);
+  font-size: clamp(0.88rem, 2.2vw, 0.97rem);
+  font-weight: 500;
+}
+
+.lg-in {
+  width: 100%;
+  height: clamp(48px, 6.8vh, 58px);
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: 500 clamp(0.92rem, 2.2vw, 1rem) 'Montserrat', system-ui, sans-serif;
+  background: rgba(255, 255, 255, .22);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+  transition: background .25s, box-shadow .25s;
+}
+
+.lg-in::placeholder {
+  color: rgba(255, 255, 255, .9);
+}
+
+.lg-in:hover {
+  background: rgba(255, 255, 255, .27);
+}
+
+.lg-in:focus {
+  outline: none;
+  background: rgba(255, 255, 255, .3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 0 0 2px rgba(255, 255, 255, .75);
+}
+
+.lg-in:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  transition: background-color 9999s;
+}
+
+.lg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  font-size: .8rem;
+  font-weight: 500;
+}
+
+.lg-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  cursor: pointer;
+}
+
+.lg-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.lg-check span {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1.3px solid #fff;
+  transition: background .2s;
+}
+
+.lg-check input:checked + span {
+  background: #fff;
+}
+
+.lg-check input:checked + span::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #0a1b13;
+  border-bottom: 2px solid #0a1b13;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.lg-check input:focus-visible + span {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.lg-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.lg-link:hover {
+  opacity: .85;
+}
+
+.lg-link:focus-visible,
+.lg-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.lg-err {
+  min-height: 1.15em;
+  margin: .05rem 0 0;
+  font-size: .8rem;
+  font-weight: 600;
+  color: #FFD3D3;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .5);
+}
+
+.lg-btn {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: min(226px, 100%);
+  height: clamp(44px, 6vh, 50px);
+  margin: clamp(0.45rem, 1.2vh, 0.9rem) auto 0;
+  padding: 0 1.5rem;
+  border: 1px solid rgba(255, 255, 255, .8);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 600 clamp(0.92rem, 2.2vw, 1rem) 'Montserrat', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background .25s, transform .18s var(--ease), box-shadow .25s;
+}
+
+.lg-btn:hover {
+  background: rgba(255, 255, 255, .18);
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .6);
+}
+
+.lg-btn:active {
+  transform: scale(.96);
+}
+
+.lg-alt {
+  margin: clamp(0.6rem, 1.5vh, 1rem) 0 0;
+  text-align: center;
+  font-size: clamp(0.86rem, 2.1vw, 0.95rem);
+  font-weight: 500;
+}
+
+.pwrap {
+  position: relative;
+  display: grid;
+}
+
+.pwrap .lg-in {
+  padding-right: 3rem;
+}
+
+.lg .eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgba(255, 255, 255, .9);
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.lg .eye:hover {
+  background: rgba(255, 255, 255, .18);
+}
+
+.lg-foot {
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .8);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .5);
+}
+
+.lg-foot .lg-link {
+  font-size: .78rem;
+  color: rgba(255, 255, 255, .9);
+}
+
+@media (max-width: 480px) {
+  .lg-card {
+    padding: 1rem 1.25rem 1.25rem;
+    border-radius: 34px;
+  }
+
+  .lg-top {
+    margin-bottom: .9rem;
+  }
+
+  .lg-sub {
+    margin-bottom: .85rem;
+  }
 }

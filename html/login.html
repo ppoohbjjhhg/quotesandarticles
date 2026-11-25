@@ -18,7 +18,6 @@
   <section class="lg-card" id="card">
     <header class="lg-top">
       <span>Quotes and Articles</span>
-      <button type="button" class="lg-link plain" id="guest">Continuar sem conta</button>
     </header>
 
     <!-- Entrar -->
@@ -26,7 +25,9 @@
       <h1>Entrar</h1>
       <p class="lg-sub">Bem-vindo de volta. Entre na sua conta.</p>
       <input id="ruser" class="lg-in" required maxlength="20" autocomplete="username" autocapitalize="none" placeholder="Usuário" aria-label="Usuário">
-      <input id="rpass" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha" aria-label="Senha">
+      <div class="pwrap">
+        <input id="rpass" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha" aria-label="Senha">
+      </div>
       <div class="lg-row">
         <label class="lg-check"><input type="checkbox" id="remember" checked><span></span>Lembrar de mim</label>
         <button type="button" class="lg-link" id="forgot">Esqueci a senha</button>
@@ -42,7 +43,9 @@
       <p class="lg-sub">Crie sua conta para curtir, salvar e comentar.</p>
       <input id="suser" class="lg-in" required minlength="3" maxlength="20" autocomplete="username" autocapitalize="none" placeholder="Usuário (apenas letras)" aria-label="Usuário">
       <input id="sname" class="lg-in" required maxlength="30" autocomplete="nickname" placeholder="Nome social (como quer aparecer)" aria-label="Nome social">
-      <input id="spass" class="lg-in" type="password" required minlength="5" maxlength="5" autocomplete="new-password" placeholder="Senha (5 letras ou números)" aria-label="Senha">
+      <div class="pwrap">
+        <input id="spass" class="lg-in" type="password" required minlength="5" maxlength="5" autocomplete="new-password" placeholder="Senha (5 letras ou números)" aria-label="Senha">
+      </div>
       <p class="lg-err" id="serr" role="alert"></p>
       <button class="lg-btn" type="submit">Criar conta</button>
       <p class="lg-alt">Já tem conta? <button type="button" class="lg-link" data-go="0">Entrar</button></p>
@@ -52,7 +55,9 @@
     <form id="adminForm" class="lg-form" hidden>
       <h1>Administrador</h1>
       <p class="lg-sub">Acesso restrito ao CEO do acervo.</p>
-      <input id="pw" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha de administrador" aria-label="Senha de administrador">
+      <div class="pwrap">
+        <input id="pw" class="lg-in" type="password" required autocomplete="current-password" placeholder="Senha de administrador" aria-label="Senha de administrador">
+      </div>
       <p class="lg-err" id="err" role="alert"></p>
       <button class="lg-btn" type="submit">Entrar</button>
       <p class="lg-alt"><button type="button" class="lg-link" data-go="0">← Voltar</button></p>
