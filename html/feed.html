@@ -78,11 +78,28 @@
     <div>
       <span class="share-eyebrow">COMPARTILHE UMA IDEIA</span>
       <h2 id="shareHeading">Leve este post com você</h2>
-      <p>Preparamos um card vertical com o autor e o link da publicação.</p>
+      <p id="shareIntro">Preparamos um card com o autor e o link da publicação.</p>
     </div>
     <button class="icon-btn share-close" id="shareClose" type="button" aria-label="Fechar">×</button>
   </div>
   <div class="share-content">
+    <div class="share-customizer">
+      <p class="share-options-title">Personalize seu card</p>
+      <div class="share-controls">
+        <label>Proporção
+          <select id="shareRatio" class="share-select"><option value="vertical">Vertical · 9:16</option><option value="horizontal">Horizontal · 16:9</option></select>
+        </label>
+        <label>Fonte
+          <select id="shareFont" class="share-select"><option value="editorial">Editorial</option><option value="modern">Moderna</option><option value="classic">Clássica</option><option value="mono">Mono</option></select>
+        </label>
+        <label>Tema
+          <select id="shareTheme" class="share-select"><option value="liquid">Liquid glass</option><option value="midnight">Meia-noite</option><option value="aurora">Aurora</option><option value="sunset">Pôr do sol</option><option value="paper">Papel</option></select>
+        </label>
+        <label class="share-color-control">Fundo <input id="shareBackground" type="color" value="#10233f"></label>
+        <label class="share-color-control">Texto <input id="shareForeground" type="color" value="#f7faff"></label>
+        <label class="share-color-control">Destaque <input id="shareAccent" type="color" value="#9edcff"></label>
+      </div>
+    </div>
     <div class="share-preview-wrap">
       <article class="share-story" id="shareStoryPreview">
         <header class="share-brand">
@@ -90,8 +107,14 @@
           <span>ACERVO<small>QUOTES &amp; ARTICLES</small></span>
         </header>
         <span class="share-category" id="shareCategory"></span>
-        <h3 id="shareTitle" hidden></h3>
-        <blockquote id="shareText"></blockquote>
+        <div class="share-media" id="shareMedia" hidden>
+          <img id="shareMediaImage" alt="">
+          <span id="shareGifNotice" hidden>GIF ANIMADO · ARQUIVO ORIGINAL</span>
+        </div>
+        <div class="share-copy" id="shareCopy">
+          <h3 id="shareTitle" hidden></h3>
+          <blockquote id="shareText"></blockquote>
+        </div>
         <footer class="share-story-footer">
           <span class="share-byline">UMA IDEIA DE <b id="shareAuthor"></b></span>
           <span class="share-story-cta">CONTINUE NO ACERVO <small id="shareUrlLabel"></small></span>
@@ -112,6 +135,7 @@
       <button class="share-option" type="button" data-share-target="instagram" data-file-share disabled>
         <span class="share-platform ig-mark">◎</span><span><b>Story do Instagram</b><small>Compartilhar o card vertical</small></span><span class="share-arrow">↗</span>
       </button>
+      <button class="btn btn-ghost share-copy-link" id="shareDownload" type="button" disabled>Baixar card personalizado</button>
       <button class="btn btn-ghost share-copy-link" id="shareCopyLink" type="button">Copiar link do post</button>
       <p class="share-note">Status e Stories abrem o compartilhamento do aparelho. No Instagram, adicione o adesivo de link no app. Quem abrir o post precisará entrar ou criar uma conta.</p>
       <p class="share-status" id="shareStatus" role="status" aria-live="polite"></p>

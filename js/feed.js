@@ -177,6 +177,39 @@
     const clean = String(text || '').replace(/\s+/g, ' ').trim();
     return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
   };
+  const isGif = s => /^data:image\/gif/.test(s) || /\.gif(\?|$)/i.test(s);
+  const SHARE_THEMES = {
+    liquid: { bg: '#10233f', fg: '#f7faff', accent: '#9edcff' },
+    midnight: { bg: '#080d1b', fg: '#f6f7fb', accent: '#9c8cff' },
+    aurora: { bg: '#102c2b', fg: '#f0fff9', accent: '#83e8ca' },
+    sunset: { bg: '#3b1d32', fg: '#fff7f1', accent: '#ffbd82' },
+    paper: { bg: '#e9eef5', fg: '#17243a', accent: '#4169e1' }
+  };
+  const SHARE_FONTS = {
+    editorial: { css: "'Newsreader', Georgia, serif", canvas: 'Georgia, serif' },
+    modern: { css: "'Sora', Arial, sans-serif", canvas: 'Arial, sans-serif' },
+    classic: { css: "'Playfair Display', Georgia, serif", canvas: 'Georgia, serif' },
+    mono: { css: "'JetBrains Mono', monospace", canvas: 'monospace' }
+  };
+  let sharingPost = null, sharingFile = null, sharingMedia = null, sharingUrl = '', shareGeneration = 0;
+  const shareSettings = () => ({
+    ratio: $('#shareRatio').value,
+    font: $('#shareFont').value,
+    bg: $('#shareBackground').value,
+    fg: $('#shareForeground').value,
+    accent: $('#shareAccent').value
+  });
+  function applyShareSettings() {
+    const settings = shareSettings(), story = $('#shareStoryPreview');
+    story.dataset.ratio = settings.ratio;
+    story.style.setProperty('--share-bg', settings.bg);
+    story.style.setProperty('--share-fg', settings.fg);
+    story.style.setProperty('--share-accent', settings.accent);
+    story.style.setProperty('--share-font', SHARE_FONTS[settings.font].css);
+    story.classList.toggle('has-media', !!sharingMedia?.url);
+    story.classList.toggle('has-gif', !!sharingMedia?.gif);
+    return settings;
+  }
   const postUrl = id => {
     const url = new URL(location.href);
     url.search = ''; url.hash = '';
@@ -212,53 +245,141 @@
     ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
-  async function makeShareImage(p, author, url) {
+  function glassPanel(ctx, x, y, w, h, r) {
+    roundedRect(ctx, x, y, w, h, r);
+    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.62)'; ctx.lineWidth = 2; ctx.stroke();
+    roundedRect(ctx, x + 3, y + 3, w - 6, Math.min(34, h - 6), Math.max(4, r - 3));
+    ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.fill();
+  }
+  function drawCover(ctx, image, x, y, w, h) {
+    ctx.save(); roundedRect(ctx, x, y, w, h, 28); ctx.clip();
+    const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+    const dw = image.naturalWidth * scale, dh = image.naturalHeight * scale;
+    ctx.drawImage(image, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+    ctx.fillStyle = 'rgba(6,18,35,.14)'; ctx.fillRect(x, y, w, h);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+    roundedRect(ctx, x, y, w, h, 28); ctx.stroke();
+  }
+  function drawShareCopy(ctx, p, settings, x, y, width, maxLines) {
+    const font = SHARE_FONTS[settings.font].canvas;
+    if (p.cat === 'artigo' && p.title) {
+      ctx.fillStyle = settings.fg; ctx.font = `700 42px ${font}`;
+      y = drawWrapped(ctx, p.title, x, y, width, 54, 2) + 22;
+    }
+    ctx.fillStyle = settings.fg;
+    ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${font}`;
+    drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', x, y, width, 52, maxLines);
+  }
+  async function loadShareMedia(url, postId) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Mídia indisponível (${response.status})`);
+    const blob = await response.blob(), gif = isGif(url) || blob.type === 'image/gif';
+    const type = gif ? 'image/gif' : (blob.type || 'image/jpeg');
+    const file = new File([blob], `acervo-${postId}.${gif ? 'gif' : 'jpg'}`, { type });
+    if (gif) return { url, gif, file, image: null };
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('Imagem inválida'));
+        element.src = objectUrl;
+      });
+      return { url, gif, file, image };
+    } finally { URL.revokeObjectURL(objectUrl); }
+  }
+  async function makeShareImage(p, author, url, settings, mediaImage) {
     const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas indisponível');
-    canvas.width = 1080; canvas.height = 1920;
-    const bg = ctx.createLinearGradient(80, 80, 1000, 1840);
-    bg.addColorStop(0, '#0A1B33'); bg.addColorStop(.52, '#16315C'); bg.addColorStop(1, '#2D6CDF');
+    const vertical = settings.ratio === 'vertical';
+    canvas.width = vertical ? 1080 : 1920; canvas.height = vertical ? 1920 : 1080;
+    const w = canvas.width, h = canvas.height, margin = vertical ? 80 : 90;
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, settings.bg); bg.addColorStop(.55, settings.accent); bg.addColorStop(1, settings.bg);
     ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.beginPath(); ctx.arc(980, 290, 330, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(87,153,255,.18)'; ctx.beginPath(); ctx.arc(130, 1570, 380, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF'; ctx.font = 'italic 72px Georgia, serif'; ctx.fillText('“', 82, 150);
-    ctx.font = '700 31px Sora, Arial, sans-serif'; ctx.fillText('ACERVO', 152, 126);
-    ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = '600 17px Sora, Arial, sans-serif'; ctx.fillText('QUOTES & ARTICLES', 154, 158);
-    ctx.fillStyle = '#BFD5FF'; ctx.font = '700 24px Sora, Arial, sans-serif';
-    ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), 90, 300);
-    ctx.fillStyle = 'rgba(255,255,255,.68)'; ctx.font = '600 18px Sora, Arial, sans-serif';
-    ctx.fillText('UMA IDEIA PARA LEVAR COM VOCÊ', 90, 354);
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(w * .92, h * .12, vertical ? 330 : 460, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.beginPath(); ctx.arc(w * .12, h * .84, vertical ? 380 : 420, 0, Math.PI * 2); ctx.fill();
+    const brandY = vertical ? 130 : 115;
+    ctx.fillStyle = settings.fg; ctx.font = `italic ${vertical ? 72 : 64}px Georgia, serif`; ctx.fillText('“', margin, brandY + 22);
+    ctx.font = `700 ${vertical ? 31 : 29}px Arial, sans-serif`; ctx.fillText('ACERVO', margin + 70, brandY);
+    ctx.fillStyle = settings.fg; ctx.globalAlpha = .68; ctx.font = '600 17px Arial, sans-serif';
+    ctx.fillText('QUOTES & ARTICLES', margin + 72, brandY + 30); ctx.globalAlpha = 1;
+    ctx.fillStyle = settings.accent; ctx.font = `700 ${vertical ? 24 : 22}px Arial, sans-serif`;
+    ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), margin, vertical ? 270 : 220);
 
-    let textY = 500;
-    if (p.cat === 'artigo' && p.title) {
-      ctx.fillStyle = '#FFFFFF'; ctx.font = '700 54px Sora, Arial, sans-serif';
-      textY = drawWrapped(ctx, p.title, 90, 470, 900, 68, 2) + 52;
+    if (vertical) {
+      const mediaY = 330, mediaH = 610, panelY = mediaImage ? 980 : 380, panelH = mediaImage ? 470 : 1060;
+      if (mediaImage) drawCover(ctx, mediaImage, margin, mediaY, w - margin * 2, mediaH);
+      glassPanel(ctx, margin, panelY, w - margin * 2, panelH, 30);
+      drawShareCopy(ctx, p, settings, margin + 42, panelY + 78, w - margin * 2 - 84, mediaImage ? 5 : 12);
+      glassPanel(ctx, margin, 1540, w - margin * 2, 285, 28);
+      ctx.fillStyle = settings.fg; ctx.font = '600 18px Arial, sans-serif'; ctx.fillText('UMA IDEIA DE', margin + 40, 1605);
+      ctx.font = '700 30px Arial, sans-serif'; ctx.fillText(excerpt(author.display_name, 32), margin + 40, 1652);
+      ctx.fillStyle = settings.accent; ctx.font = '700 20px Arial, sans-serif'; ctx.fillText('CONTINUE LENDO NO ACERVO', margin + 40, 1710);
+      ctx.fillStyle = settings.fg; ctx.globalAlpha = .8; ctx.font = '18px Arial, sans-serif';
+      drawWrapped(ctx, url, margin + 40, 1750, w - margin * 2 - 80, 26, 2); ctx.globalAlpha = 1;
+    } else {
+      const mediaX = margin, mediaY = 280, mediaW = 790, panelX = mediaImage ? 930 : margin;
+      const panelW = mediaImage ? w - panelX - margin : w - margin * 2;
+      if (mediaImage) drawCover(ctx, mediaImage, mediaX, mediaY, mediaW, 550);
+      glassPanel(ctx, panelX, mediaY, panelW, 550, 30);
+      drawShareCopy(ctx, p, settings, panelX + 42, mediaY + 82, panelW - 84, mediaImage ? 6 : 7);
+      glassPanel(ctx, margin, 900, w - margin * 2, 125, 24);
+      ctx.fillStyle = settings.fg; ctx.font = '700 23px Arial, sans-serif';
+      ctx.fillText(`${excerpt(author.display_name, 32)} · CONTINUE NO ACERVO`, margin + 34, 950);
+      ctx.fillStyle = settings.accent; ctx.font = '18px Arial, sans-serif';
+      drawWrapped(ctx, url, margin + 34, 990, w - margin * 2 - 68, 24, 1);
     }
-    ctx.fillStyle = 'rgba(255,255,255,.92)';
-    ctx.font = p.cat === 'quote' ? 'italic 58px Georgia, serif' : '48px Georgia, serif';
-    drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', 90, textY, 900, 70, 10);
-
-    ctx.fillStyle = 'rgba(255,255,255,.12)';
-    roundedRect(ctx, 70, 1510, 940, 300, 30); ctx.fill();
-    ctx.fillStyle = '#FFFFFF'; ctx.font = '600 18px Sora, Arial, sans-serif';
-    ctx.fillText('UMA IDEIA DE', 110, 1580);
-    ctx.font = '700 30px Sora, Arial, sans-serif';
-    ctx.fillText(excerpt(author.display_name, 32), 110, 1628);
-    ctx.fillStyle = '#CFE0FF'; ctx.font = '700 20px Sora, Arial, sans-serif';
-    ctx.fillText('CONTINUE LENDO NO ACERVO', 110, 1690);
-    ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.font = '18px Sora, Arial, sans-serif';
-    drawWrapped(ctx, url, 110, 1730, 850, 27, 2);
-
     const blob = await new Promise((resolve, reject) => canvas.toBlob(
       value => value ? resolve(value) : reject(new Error('Não foi possível criar o card')),
       'image/png'
     ));
-    return new File([blob], `acervo-${p.id}.png`, { type: 'image/png' });
+    return new File([blob], `acervo-${p.id}.${vertical ? 'vertical' : 'horizontal'}.png`, { type: 'image/png' });
   }
-  let sharingPost = null, sharingFile = null, sharingUrl = '';
-  async function openShare(p) {
-    sharingPost = p; sharingFile = null; sharingUrl = postUrl(p.id);
+  async function refreshShareDesign() {
+    const settings = applyShareSettings(), p = sharingPost, generation = ++shareGeneration;
+    if (!p) return;
+    sharingFile = null;
+    $('#shareDownload').disabled = true;
+    document.querySelectorAll('[data-file-share]').forEach(button => {
+      button.disabled = true;
+      button.querySelector('small').textContent = sharingMedia?.gif
+        ? 'Enviar o GIF animado original'
+        : `Compartilhar card ${settings.ratio === 'vertical' ? 'vertical' : 'horizontal'}`;
+    });
+    if (sharingMedia?.loading) { $('#shareStatus').textContent = 'Carregando a mídia do post…'; return; }
+    if (sharingMedia?.gif) {
+      if (!sharingMedia.file) { $('#shareStatus').textContent = 'Não foi possível carregar o GIF original para compartilhar.'; return; }
+      sharingFile = sharingMedia.file;
+      $('#shareDownload').disabled = false;
+      $('#shareDownload').textContent = 'Baixar GIF animado original';
+      document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
+      $('#shareStatus').textContent = 'GIF original pronto: ele não será convertido em imagem estática. As opções de estilo aparecem na prévia.';
+      return;
+    }
     const author = p.author_id ? who(p.author_id) : adminCard();
+    try {
+      const file = await makeShareImage(p, author, sharingUrl, settings, sharingMedia?.image);
+      if (generation !== shareGeneration || sharingPost !== p) return;
+      sharingFile = file;
+      $('#shareDownload').disabled = false;
+      $('#shareDownload').textContent = 'Baixar card personalizado';
+      document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
+      $('#shareStatus').textContent = sharingMedia?.error
+        ? 'Card pronto, mas não foi possível incluir a imagem. Verifique a conexão e tente novamente.'
+        : 'Card personalizado pronto para compartilhar.';
+    } catch {
+      if (generation !== shareGeneration || sharingPost !== p) return;
+      $('#shareStatus').textContent = 'Não foi possível preparar o card neste navegador.';
+    }
+  }
+  async function openShare(p) {
+    sharingPost = p; sharingFile = null; sharingUrl = postUrl(p.id); sharingMedia = null;
+    const author = p.author_id ? who(p.author_id) : adminCard(), mediaUrl = DB.imgs(p)[0] || '';
+    const gif = mediaUrl ? isGif(mediaUrl) : false;
+    const image = $('#shareMediaImage');
     $('#shareCategory').textContent = (CATS[p.cat] || CATS.nota).l;
     $('#shareTitle').hidden = !(p.cat === 'artigo' && p.title);
     $('#shareTitle').textContent = p.cat === 'artigo' ? p.title || '' : '';
@@ -267,21 +388,41 @@
     $('#shareUrlLabel').textContent = sharingUrl;
     $('#sharePermalink').href = sharingUrl;
     $('#sharePermalink').textContent = sharingUrl;
-    $('#shareStatus').textContent = 'Preparando seu card…';
-    document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = true; });
+    $('#shareMedia').hidden = !mediaUrl;
+    $('#shareGifNotice').hidden = !gif;
+    $('#shareIntro').textContent = gif
+      ? 'O GIF será enviado como arquivo original para preservar a animação; proporção, fonte e cores personalizam apenas a prévia.'
+      : 'Ajuste o formato, a fonte e as cores para criar seu card Liquid Glass.';
+    $('#shareDownload').textContent = gif ? 'Baixar GIF animado original' : 'Baixar card personalizado';
+    $('#shareDownload').disabled = true;
+    document.querySelectorAll('[data-file-share] small').forEach(label => {
+      label.textContent = gif ? 'Enviar o GIF animado original' : 'Compartilhar o card personalizado';
+    });
+    if (mediaUrl) {
+      image.src = mediaUrl;
+      image.alt = gif ? 'Prévia do GIF animado' : 'Imagem do post';
+      sharingMedia = { url: mediaUrl, gif, loading: true };
+    } else {
+      image.removeAttribute('src'); image.alt = '';
+    }
+    applyShareSettings();
     $('#shareDialog').showModal();
-    try {
-      const file = await makeShareImage(p, author, sharingUrl);
-      if (sharingPost !== p) return;
-      sharingFile = file;
-      document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
-      $('#shareStatus').textContent = 'Seu card está pronto para compartilhar.';
-    } catch {
-      if (sharingPost !== p) return;
-      $('#shareStatus').textContent = 'Não foi possível preparar o card neste navegador.';
+    if (!mediaUrl) { await refreshShareDesign(); return; }
+    $('#shareStatus').textContent = 'Carregando a mídia do post…';
+    try { sharingMedia = await loadShareMedia(mediaUrl, p.id); }
+    catch { sharingMedia = { url: mediaUrl, gif, loading: false, error: true, file: null, image: null }; }
+    if (sharingPost === p) {
+      $('#shareGifNotice').hidden = !sharingMedia.gif;
+      $('#shareIntro').textContent = sharingMedia.gif
+        ? 'O GIF original será enviado sem conversão para preservar a animação; o estilo personalizado aparece apenas na prévia.'
+        : 'A imagem do post será integrada ao card Liquid Glass.';
+      document.querySelectorAll('[data-file-share] small').forEach(label => {
+        label.textContent = sharingMedia.gif ? 'Enviar o GIF animado original' : 'Compartilhar o card personalizado';
+      });
+      await refreshShareDesign();
     }
   }
-  function downloadShareImage() {
+  function downloadShareFile() {
     if (!sharingFile) return;
     const objectUrl = URL.createObjectURL(sharingFile), link = document.createElement('a');
     link.href = objectUrl; link.download = sharingFile.name; link.click();
@@ -294,17 +435,35 @@
     if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: data.files })) {
       try {
         await navigator.share(data);
-        $('#shareStatus').textContent = 'Compartilhamento aberto. Se necessário, adicione o link no próprio aplicativo.';
+        $('#shareStatus').textContent = sharingMedia?.gif
+          ? 'GIF original enviado ao compartilhamento. A plataforma de destino controla a animação.'
+          : 'Compartilhamento aberto. Se necessário, adicione o link no próprio aplicativo.';
       } catch (error) {
         if (error.name === 'AbortError') { $('#shareStatus').textContent = 'Compartilhamento cancelado.'; return; }
-        downloadShareImage();
-        $('#shareStatus').textContent = 'Não foi possível abrir o compartilhamento. Baixamos o card para você publicar manualmente.';
+        downloadShareFile();
+        $('#shareStatus').textContent = 'Não foi possível abrir o compartilhamento. Baixamos o arquivo para você publicar manualmente.';
       }
       return;
     }
-    downloadShareImage();
-    $('#shareStatus').textContent = 'Card baixado. Publique-o no aplicativo e use “Copiar link do post” para compartilhar o endereço.';
+    downloadShareFile();
+    $('#shareStatus').textContent = 'Arquivo baixado. Publique-o no aplicativo e use “Copiar link do post” para compartilhar o endereço.';
   }
+  $('#shareTheme').addEventListener('change', () => {
+    const theme = SHARE_THEMES[$('#shareTheme').value];
+    $('#shareBackground').value = theme.bg;
+    $('#shareForeground').value = theme.fg;
+    $('#shareAccent').value = theme.accent;
+    refreshShareDesign();
+  });
+  ['shareRatio', 'shareFont'].forEach(id => $(`#${id}`).addEventListener('change', refreshShareDesign));
+  ['shareBackground', 'shareForeground', 'shareAccent'].forEach(id => {
+    $(`#${id}`).addEventListener('input', applyShareSettings);
+    $(`#${id}`).addEventListener('change', refreshShareDesign);
+  });
+  $('#shareDownload').addEventListener('click', () => {
+    downloadShareFile();
+    $('#shareStatus').textContent = sharingMedia?.gif ? 'GIF animado original baixado.' : 'Card personalizado baixado.';
+  });
   $('#shareClose').addEventListener('click', () => $('#shareDialog').close());
   $('#shareDialog').addEventListener('click', e => { if (e.target === $('#shareDialog')) $('#shareDialog').close(); });
   $('#shareCopyLink').addEventListener('click', async () => {
@@ -573,7 +732,6 @@
   }
 
   // ---- publicar
-  const isGif = s => /^data:image\/gif/.test(s) || /\.gif(\?|$)/i.test(s);
   const readFile = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
   if (logged) {
     $('#composer').hidden = false;
