@@ -1,4 +1,4 @@
-if (Auth.session()) location.replace('feed.html');
+if (Auth.session()) location.replace(`feed.html${location.search}`);
 
 const $ = id => document.getElementById(id);
 const forms = ['readerForm', 'signForm', 'adminForm'].map($);
@@ -23,7 +23,7 @@ $('forgot').addEventListener('click', () => {
   $('rerr').textContent = 'Não há recuperação por e-mail. Peça ao administrador para redefinir sua senha ou crie uma nova conta.';
 });
 
-const go = () => { card.classList.add('leave'); setTimeout(() => location.replace('feed.html'), 350); };
+const go = () => { card.classList.add('leave'); setTimeout(() => location.replace(`feed.html${location.search}`), 350); };
 
 // Entrar (leitor)
 forms[0].addEventListener('submit', async e => {

@@ -1,6 +1,6 @@
 (() => {
   const S = Auth.session();
-  if (!S) { location.replace('login.html'); return; }
+  if (!S) { location.replace(`login.html${location.search}`); return; }
   const admin = S.role === 'admin', reader = S.role === 'reader', logged = admin || reader, uid = S.uid;
   if (logged && !S.token) { Auth.logout(); return; }
   const $ = s => document.querySelector(s);
@@ -17,11 +17,17 @@
   // Para evoluir os requisitos no futuro, mude só os números de 'min' abaixo.
   const LEVELS = [{ k: 'novato', n: 'Novato', min: 0 }, { k: 'bronze', n: 'Bronze', min: 10 }, { k: 'prata', n: 'Prata', min: 20 }, { k: 'ouro', n: 'Ouro', min: 35 }, { k: 'diamante', n: 'Diamante', min: 50 }, { k: 'lendario', n: 'Lendário', min: 70 }];
   const LC = { novato: '#8896AB', bronze: '#B8742F', prata: '#7C8794', ouro: '#C48A00', diamante: '#2F9FD0', lendario: '#A23FE8' };
+  const POST_BADGES = [
+    { min: 1, n: 'Primeira publicação', i: 'file' },
+    { min: 5, n: 'Autor em ascensão', i: 'note' },
+    { min: 10, n: 'Autor dedicado', i: 'book' },
+    { min: 25, n: 'Autor destaque', i: 'crown' }
+  ];
   const NAV = [['all', 'home', 'Início'], ['quote', 'quote', 'Quotes'], ['nota', 'note', 'Notas'], ['estudo', 'book', 'Estudos'], ['artigo', 'file', 'Artigos'], ['ranking', 'trophy', 'Ranking']];
   if (logged) NAV.push(['saved', 'save', 'Salvos'], ['profile', 'user', 'Perfil']);
   const AUTHOR = { name: 'Pedro Henrique', handle: '@henrique' }, MAX = 5, GIF_MAX = 6 * 1024 * 1024, NAME_RE = /^[A-Za-zÀ-ÿ0-9]{5,}$/;
 
-  let posts = [], likes = {}, comments = {}, cards = {}, stats = {}, saves = new Set(), me = null;
+  let posts = [], likes = {}, comments = {}, cards = {}, stats = {}, publicationCounts = {}, saves = new Set(), me = null;
   let view = 'feed', tab = 'all', cat = 'all', q = '';
   let editing = null, newCat = 'nota', font = '', color = '', imgs = [];
 
@@ -59,7 +65,7 @@
     $('#meName').textContent = c.display_name;
     $('#meRole').textContent = admin ? 'CEO e administrador' : reader ? 'Leitor' : 'Sem conta';
     $('#meAv').innerHTML = av(c, 'x', false);
-    if (admin) $('#cAv').innerHTML = av(c, 'x', false);
+    if (logged) $('#cAv').innerHTML = av(c, 'x', false);
   }
   const needAccount = () => { if (logged) return false; if (confirm('Entre ou crie uma conta para interagir. Ir para o login?')) Auth.logout(); return true; };
   function bump() {   // recalcula pontos e avisa quando o leitor sobe de nível
@@ -77,7 +83,7 @@
     view = v;
     $('#profileView').hidden = !(v === 'profile' || v === 'user'); $('#rankView').hidden = v !== 'ranking';
     $('#tabs').hidden = v !== 'feed'; $('#feed').style.display = v === 'feed' ? 'grid' : 'none';
-    if (admin) $('#composer').hidden = v !== 'feed';
+    if (logged) $('#composer').hidden = v !== 'feed';
   }
   function navTo(k) {
     cat = k;
@@ -159,25 +165,188 @@
     c.querySelector('.car-prev').disabled = i === 0;
     c.querySelector('.car-next').disabled = i === n - 1;
   }
+  function syncReadMore(el) {
+    const text = el.querySelector('.p-text'), button = el.querySelector('.read-more');
+    if (!text || !button) return;
+    text.classList.remove('is-collapsed');
+    const fullHeight = text.getBoundingClientRect().height;
+    text.classList.add('is-collapsed');
+    button.hidden = fullHeight <= text.getBoundingClientRect().height + 1;
+  }
+  const excerpt = (text, max) => {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+  };
+  const postUrl = id => {
+    const url = new URL(location.href);
+    url.search = ''; url.hash = '';
+    url.searchParams.set('post', id);
+    return url.href;
+  };
+  const shareCaption = (p, author) => {
+    const content = p.cat === 'artigo' && p.title ? `“${p.title}”` : `“${excerpt(p.text, 180) || 'uma publicação interessante'}”`;
+    return `${author.display_name} publicou no Acervo:\n${content}`;
+  };
+  function drawWrapped(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    const lines = [];
+    let line = '', index = 0;
+    for (; index < words.length; index++) {
+      const test = line ? `${line} ${words[index]}` : words[index];
+      if (line && ctx.measureText(test).width > maxWidth) {
+        lines.push(line); line = words[index];
+        if (lines.length === maxLines) break;
+      } else line = test;
+    }
+    if (line && lines.length < maxLines) lines.push(line);
+    if (index < words.length && lines.length) {
+      let last = lines[lines.length - 1];
+      while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+      lines[lines.length - 1] = `${last}…`;
+    }
+    lines.forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
+    return y + lines.length * lineHeight;
+  }
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  async function makeShareImage(p, author, url) {
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas indisponível');
+    canvas.width = 1080; canvas.height = 1920;
+    const bg = ctx.createLinearGradient(80, 80, 1000, 1840);
+    bg.addColorStop(0, '#0A1B33'); bg.addColorStop(.52, '#16315C'); bg.addColorStop(1, '#2D6CDF');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.beginPath(); ctx.arc(980, 290, 330, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(87,153,255,.18)'; ctx.beginPath(); ctx.arc(130, 1570, 380, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.font = 'italic 72px Georgia, serif'; ctx.fillText('“', 82, 150);
+    ctx.font = '700 31px Sora, Arial, sans-serif'; ctx.fillText('ACERVO', 152, 126);
+    ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = '600 17px Sora, Arial, sans-serif'; ctx.fillText('QUOTES & ARTICLES', 154, 158);
+    ctx.fillStyle = '#BFD5FF'; ctx.font = '700 24px Sora, Arial, sans-serif';
+    ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), 90, 300);
+    ctx.fillStyle = 'rgba(255,255,255,.68)'; ctx.font = '600 18px Sora, Arial, sans-serif';
+    ctx.fillText('UMA IDEIA PARA LEVAR COM VOCÊ', 90, 354);
+
+    let textY = 500;
+    if (p.cat === 'artigo' && p.title) {
+      ctx.fillStyle = '#FFFFFF'; ctx.font = '700 54px Sora, Arial, sans-serif';
+      textY = drawWrapped(ctx, p.title, 90, 470, 900, 68, 2) + 52;
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.font = p.cat === 'quote' ? 'italic 58px Georgia, serif' : '48px Georgia, serif';
+    drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', 90, textY, 900, 70, 10);
+
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    roundedRect(ctx, 70, 1510, 940, 300, 30); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.font = '600 18px Sora, Arial, sans-serif';
+    ctx.fillText('UMA IDEIA DE', 110, 1580);
+    ctx.font = '700 30px Sora, Arial, sans-serif';
+    ctx.fillText(excerpt(author.display_name, 32), 110, 1628);
+    ctx.fillStyle = '#CFE0FF'; ctx.font = '700 20px Sora, Arial, sans-serif';
+    ctx.fillText('CONTINUE LENDO NO ACERVO', 110, 1690);
+    ctx.fillStyle = 'rgba(255,255,255,.78)'; ctx.font = '18px Sora, Arial, sans-serif';
+    drawWrapped(ctx, url, 110, 1730, 850, 27, 2);
+
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(
+      value => value ? resolve(value) : reject(new Error('Não foi possível criar o card')),
+      'image/png'
+    ));
+    return new File([blob], `acervo-${p.id}.png`, { type: 'image/png' });
+  }
+  let sharingPost = null, sharingFile = null, sharingUrl = '';
+  async function openShare(p) {
+    sharingPost = p; sharingFile = null; sharingUrl = postUrl(p.id);
+    const author = p.author_id ? who(p.author_id) : adminCard();
+    $('#shareCategory').textContent = (CATS[p.cat] || CATS.nota).l;
+    $('#shareTitle').hidden = !(p.cat === 'artigo' && p.title);
+    $('#shareTitle').textContent = p.cat === 'artigo' ? p.title || '' : '';
+    $('#shareText').textContent = excerpt(p.text || p.title || 'Uma ideia para descobrir no Acervo.', 340);
+    $('#shareAuthor').textContent = author.display_name;
+    $('#shareUrlLabel').textContent = sharingUrl;
+    $('#sharePermalink').href = sharingUrl;
+    $('#sharePermalink').textContent = sharingUrl;
+    $('#shareStatus').textContent = 'Preparando seu card…';
+    document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = true; });
+    $('#shareDialog').showModal();
+    try {
+      const file = await makeShareImage(p, author, sharingUrl);
+      if (sharingPost !== p) return;
+      sharingFile = file;
+      document.querySelectorAll('[data-file-share]').forEach(button => { button.disabled = false; });
+      $('#shareStatus').textContent = 'Seu card está pronto para compartilhar.';
+    } catch {
+      if (sharingPost !== p) return;
+      $('#shareStatus').textContent = 'Não foi possível preparar o card neste navegador.';
+    }
+  }
+  function downloadShareImage() {
+    if (!sharingFile) return;
+    const objectUrl = URL.createObjectURL(sharingFile), link = document.createElement('a');
+    link.href = objectUrl; link.download = sharingFile.name; link.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+  async function shareStory() {
+    if (!sharingFile) return;
+    const p = sharingPost, author = p.author_id ? who(p.author_id) : adminCard();
+    const data = { files: [sharingFile], title: 'Post do Acervo', text: `${shareCaption(p, author)}\nLeia no Acervo: ${sharingUrl}` };
+    if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: data.files })) {
+      try {
+        await navigator.share(data);
+        $('#shareStatus').textContent = 'Compartilhamento aberto. Se necessário, adicione o link no próprio aplicativo.';
+      } catch (error) {
+        if (error.name === 'AbortError') { $('#shareStatus').textContent = 'Compartilhamento cancelado.'; return; }
+        downloadShareImage();
+        $('#shareStatus').textContent = 'Não foi possível abrir o compartilhamento. Baixamos o card para você publicar manualmente.';
+      }
+      return;
+    }
+    downloadShareImage();
+    $('#shareStatus').textContent = 'Card baixado. Publique-o no aplicativo e use “Copiar link do post” para compartilhar o endereço.';
+  }
+  $('#shareClose').addEventListener('click', () => $('#shareDialog').close());
+  $('#shareDialog').addEventListener('click', e => { if (e.target === $('#shareDialog')) $('#shareDialog').close(); });
+  $('#shareCopyLink').addEventListener('click', async () => {
+    if (!navigator.clipboard?.writeText) { $('#shareStatus').textContent = 'Este navegador não permite copiar automaticamente. Selecione o link exibido abaixo do botão.'; return; }
+    try { await navigator.clipboard.writeText(sharingUrl); $('#shareStatus').textContent = 'Link copiado!'; }
+    catch { $('#shareStatus').textContent = 'Não foi possível copiar. Selecione o link exibido abaixo do botão.'; }
+  });
+  $('#shareDialog').addEventListener('click', async e => {
+    const button = e.target.closest('[data-share-target]');
+    if (!button) return;
+    const p = sharingPost, author = p.author_id ? who(p.author_id) : adminCard(), caption = shareCaption(p, author);
+    if (button.dataset.shareTarget === 'x') {
+      const intent = new URL('https://twitter.com/intent/tweet');
+      intent.searchParams.set('text', caption); intent.searchParams.set('url', sharingUrl);
+      window.open(intent.href, '_blank', 'noopener,noreferrer');
+    } else if (button.dataset.shareTarget === 'wa-message') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${caption}\nLeia no Acervo: ${sharingUrl}`)}`, '_blank', 'noopener,noreferrer');
+    } else {
+      await shareStory();
+    }
+  });
   $('#feed').addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('car-track')) carState(e.target); }, true);
 
   function card(p) {
-    const C = CATS[p.cat] || CATS.nota, fk = p.font && FONTS[p.font] ? ' f-' + p.font : '', ck = p.color && COLORS[p.color] ? ' has-pc pc-' + p.color : '', ac = adminCard();
+    const C = CATS[p.cat] || CATS.nota, fk = p.font && FONTS[p.font] ? ' f-' + p.font : '', ck = p.color && COLORS[p.color] ? ' has-pc pc-' + p.color : '', ac = p.author_id ? who(p.author_id) : adminCard();
+    const canManage = admin || p.author_id === uid;
     const el = document.createElement('article');
     el.className = 'post glass reveal' + ck; el.dataset.cat = p.cat; el.dataset.id = p.id;
     el.innerHTML = `
       ${av(ac, 'x')}
       <div class="p-body">
-        <div class="p-top">${ulink(ac)}${ceoBadge()}<span>@${esc(ac.username || 'henrique')} · ${fmt(p.created_at)}${p.updated_at ? ` · <span title="Editado em ${esc(fmt(p.updated_at))}">editado</span>` : ''}</span><span class="tag">${UI.icon(C.i, 13)}${C.l}</span></div>
+        <div class="p-top">${ulink(ac)}${ac.is_admin ? ceoBadge() : ''}<span>@${esc(ac.username || 'henrique')} · ${fmt(p.created_at)}${p.updated_at ? ` · <span title="Editado em ${esc(fmt(p.updated_at))}">editado</span>` : ''}</span><span class="tag">${UI.icon(C.i, 13)}${C.l}</span></div>
         ${p.title ? `<h2 class="p-title${fk}">${esc(p.title)}</h2>` : ''}
-        ${p.text ? `<p class="p-text${fk}">${esc(p.text)}</p>` : ''}
+        ${p.text ? `<p class="p-text${fk} is-collapsed">${esc(p.text)}</p><button type="button" class="read-more" data-act="read-more" aria-expanded="false" hidden>Ler mais</button>` : ''}
         ${carousel(DB.imgs(p))}
         <div class="acts">
           <span class="lk"></span>
           <button class="icon-btn" data-act="comments" aria-label="Comentários">${UI.icon('chat', 18)}</button><span class="like-n cn"></span>
           <button class="icon-btn${saves.has(p.id) ? ' on' : ''}" data-act="save" aria-label="Salvar">${UI.icon('save', 18)}</button>
           <button class="icon-btn" data-act="copy" aria-label="Copiar texto">${UI.icon('copy', 18)}</button>
-          ${admin ? `<button class="icon-btn" data-act="edit" aria-label="Editar">${UI.icon('edit', 18)}</button><button class="icon-btn" data-act="del" aria-label="Excluir">${UI.icon('trash', 18)}</button>` : ''}
+          <button class="icon-btn" data-act="share" aria-label="Compartilhar publicação">${UI.icon('share', 18)}</button>
+          ${canManage ? `<button class="icon-btn" data-act="edit" aria-label="Editar">${UI.icon('edit', 18)}</button><button class="icon-btn" data-act="del" aria-label="Excluir">${UI.icon('trash', 18)}</button>` : ''}
         </div>
         <p class="likers" hidden></p>
         <div class="cmts" hidden>
@@ -199,9 +368,20 @@
     const wrap = document.createDocumentFragment();
     list.forEach(p => wrap.append(card(p)));
     feed.append(wrap);
-    feed.querySelectorAll('.post').forEach((c, i) => { c.style.transitionDelay = `${Math.min(i, 4) * 40}ms`; UI.reveal(c); });
+    feed.querySelectorAll('.post').forEach((c, i) => { c.style.transitionDelay = `${Math.min(i, 4) * 40}ms`; UI.reveal(c); syncReadMore(c); });
     feed.querySelectorAll('.car-track').forEach(carState);
     feed.style.display = 'grid'; feed.style.gap = '1rem';
+  }
+  function focusLinkedPost() {
+    const id = new URLSearchParams(location.search).get('post');
+    if (!id) return;
+    requestAnimationFrame(() => {
+      const post = [...document.querySelectorAll('#feed .post')].find(el => el.dataset.id === id);
+      if (!post) return;
+      post.classList.add('in', 'share-highlight');
+      post.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => post.classList.remove('share-highlight'), 2600);
+    });
   }
 
   $('#feed').addEventListener('click', async e => {
@@ -209,7 +389,14 @@
     if (d) { const t = d.parentElement.querySelector('.car-track'); t.scrollBy({ left: +d.dataset.dir * t.clientWidth, behavior: 'smooth' }); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const el = b.closest('.post'), id = el.dataset.id, p = posts.find(x => x.id === id), act = b.dataset.act;
-    if (act === 'copy') {
+    if (act === 'share') {
+      openShare(p);
+    } else if (act === 'read-more') {
+      const expanded = b.getAttribute('aria-expanded') === 'true';
+      el.querySelector('.p-text').classList.toggle('is-collapsed', expanded);
+      b.setAttribute('aria-expanded', String(!expanded));
+      b.textContent = expanded ? 'Ler mais' : 'Ler menos';
+    } else if (act === 'copy') {
       navigator.clipboard?.writeText(`${p.title ? p.title + '\n' : ''}${p.text}`).then(() => UI.toast('Copiado'));
     } else if (act === 'comments') {
       el.querySelector('.cmts').hidden = !el.querySelector('.cmts').hidden;
@@ -230,11 +417,11 @@
       if (!confirm('Apagar este comentário?')) return;
       try { await DB.delComment(cid); comments[id] = (comments[id] || []).filter(c => c.id !== cid); bump(); renderComments(el, id); }
       catch { UI.toast('Não foi possível apagar.'); }
-    } else if (act === 'edit' && admin) {
+    } else if (act === 'edit' && (admin || p.author_id === uid)) {
       startEdit(p);
-    } else if (act === 'del' && admin && confirm('Excluir esta publicação para todos?')) {
+    } else if (act === 'del' && (admin || p.author_id === uid) && confirm('Excluir esta publicação?')) {
       try { await DB.remove(p); posts = posts.filter(x => x.id !== id); render(); UI.toast('Excluído'); }
-      catch { UI.toast('Não foi possível excluir. Entre de novo como administrador.'); }
+      catch { UI.toast('Não foi possível excluir esta publicação.'); }
     }
   });
   $('#feed').addEventListener('submit', async e => {
@@ -275,6 +462,12 @@
       ${c.bio ? `<p class="pf-bio">${esc(c.bio)}</p>` : ''}</div>`;
   }
   const st2 = (ic, n, label) => `<div class="st2"><span class="ic">${UI.icon(ic, 18)}</span><b data-count="${n}">0</b><small>${label}</small></div>`;
+  function publicationRewards(u) {
+    const count = publicationCounts[u] || 0, next = POST_BADGES.find(b => b.min > count);
+    return `<section class="pf-sec pub-rewards"><h3>Selos de publicação</h3>
+      <div class="pub-badges">${POST_BADGES.map(b => `<div class="pub-badge${count >= b.min ? ' earned' : ''}" title="${count >= b.min ? 'Selo conquistado' : `Conquiste ao publicar ${b.min} posts`}">${UI.icon(b.i, 18)}<span>${b.n}</span><small>${b.min} ${b.min === 1 ? 'post' : 'posts'}</small></div>`).join('')}</div>
+      <p class="muted">${next ? `Você publicou ${count} de ${next.min} posts para o próximo selo.` : 'Todos os selos de publicação conquistados!'}</p></section>`;
+  }
   function levelBox(u) {
     const t = total(u), lv = levelOf(u), nx = nextLevel(u);
     return `<div class="lvbox"><div class="lv-top">${lvlBadge(u, true)}<span class="muted">${t} ${t === 1 ? 'interação' : 'interações'}</span></div>
@@ -303,6 +496,7 @@
       <div class="st-grid">${ceo ? st2('file', posts.length, 'Publicações') + st2('heart', received(), 'Curtidas recebidas') + st2('user', readersCount(), 'Leitores')
         : st2('heart', st.likes, 'Curtidas') + st2('chat', st.comments, 'Comentários') + st2('trophy', st.total, 'Interações')}</div>
       ${ceo ? '' : levelBox(u)}
+      ${ceo ? '' : publicationRewards(u)}
       ${(c.interests || []).length ? `<section class="pf-sec"><h3>Interesses de leitura</h3><div class="topics">${c.interests.map(t => `<span class="topic on">${esc(t)}</span>`).join('')}</div></section>` : ''}
       ${socialLink(c.social) ? `<section class="pf-sec"><h3>Redes</h3><div class="pf-links">${socialLink(c.social)}</div></section>` : ''}
       ${c.created_at ? `<p class="since">Membro desde ${esc(fmtM(c.created_at))}</p>` : ''}</div>`;
@@ -323,6 +517,7 @@
       <div class="st-grid">${admin ? st2('file', posts.length, 'Publicações') + st2('heart', received(), 'Curtidas recebidas') + st2('user', readersCount(), 'Leitores')
         : st2('heart', st.likes, 'Curtidas') + st2('chat', st.comments, 'Comentários') + st2('trophy', st.total, 'Interações')}</div>
       ${admin ? '' : levelBox(uid)}
+      ${admin ? '' : publicationRewards(uid)}
       <form id="pfForm" class="pf-form">
         <label>Nome<input class="input" id="fName" maxlength="30" value="${esc(me.name)}" ${nameLocked ? 'disabled' : ''}><small>${nameLocked ? 'Você já usou a alteração de nome.' : 'Você pode alterar o nome apenas mais 1 vez.'}</small></label>
         <label>Nome social<input class="input" id="fSocialName" maxlength="30" value="${esc(me.social_name || '')}" placeholder="Opcional"><small>Aparece no lugar do nome nos comentários, curtidas e perfil.</small></label>
@@ -377,10 +572,10 @@
     });
   }
 
-  // ---- publicar (CEO)
+  // ---- publicar
   const isGif = s => /^data:image\/gif/.test(s) || /\.gif(\?|$)/i.test(s);
   const readFile = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-  if (admin) {
+  if (logged) {
     $('#composer').hidden = false;
     $('#attach').innerHTML = UI.icon('image');
     $('#cfont').innerHTML = Object.entries(FONTS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
@@ -440,8 +635,9 @@
       const btn = $('#publish'); btn.disabled = true; btn.textContent = editing ? 'Salvando…' : 'Publicando…';
       try {
         const urls = [];
-        for (const s of imgs) urls.push(s.startsWith('data:') ? await DB.upload(s) : s);
+        for (const s of imgs) urls.push(s.startsWith('data:') ? await DB.upload(s, reader ? uid : '') : s);
         const body = { cat: newCat, title: $('#ctitle').hidden ? '' : $('#ctitle').value.trim(), text: $('#ctext').value.trim(), font, color, imgs: urls, img: null };
+        if (reader) body.author_id = uid;
         if (editing) {
           body.updated_at = new Date().toISOString();
           const u = await DB.update(editing.id, body);
@@ -449,9 +645,12 @@
           posts = posts.map(x => x.id === u.id ? u : x);
           stopEdit(); render(); UI.toast('Alterações salvas');
         } else {
-          posts.unshift(await DB.add(body)); clearForm(); render(); UI.toast('Publicado para todos');
+          posts.unshift(await DB.add(body));
+          if (reader) publicationCounts[uid] = (publicationCounts[uid] || 0) + 1;
+          const badge = reader && POST_BADGES.find(b => b.min === publicationCounts[uid]);
+          clearForm(); render(); UI.toast(badge ? `Novo selo: ${badge.n}!` : 'Publicado para todos');
         }
-      } catch { UI.toast('Erro ao salvar. Entre de novo como administrador.'); }
+      } catch { UI.toast('Não foi possível salvar. Confira se o SQL v5 foi executado e tente novamente.'); }
       finally { btn.textContent = editing ? 'Salvar alterações' : 'Publicar'; sync(); }
     };
 
@@ -480,17 +679,22 @@
   (async () => {
     $('#feed').innerHTML = '<p class="empty">Carregando…</p>';
     try {
-      const [ps, ls, cs, cd] = await Promise.all([DB.list(), DB.likes().catch(() => []), DB.comments().catch(() => []), DB.cards().catch(() => [])]);
+      const [ps, ls, cs, cd, pc] = await Promise.all([
+        DB.list(), DB.likes().catch(() => []), DB.comments().catch(() => []), DB.cards().catch(() => []),
+        DB.publicationCounts().catch(() => null)
+      ]);
       posts = ps;
       ls.forEach(l => (likes[l.post_id] = likes[l.post_id] || []).push(l.user_id));
       cs.forEach(c => (comments[c.post_id] = comments[c.post_id] || []).push(c));
       cd.forEach(c => { cards[c.id] = c; });
+      if (pc) pc.forEach(c => { publicationCounts[c.user_id] = c.total; });
+      else UI.toast('Os selos não carregaram. Verifique a conexão e execute o SQL v5 no Supabase, se ainda não fez isso.');
       computeStats();
       if (logged) {
         const [sv, mp] = await Promise.all([DB.saves().catch(() => []), DB.myProfile(uid).catch(() => null)]);
         sv.forEach(s => saves.add(s.post_id)); me = mp || null;
       }
-      paintMe(); render();
+      paintMe(); render(); focusLinkedPost();
     } catch { $('#feed').innerHTML = '<p class="empty">Não foi possível carregar as publicações.</p>'; }
   })();
 })();

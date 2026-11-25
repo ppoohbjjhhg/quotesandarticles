@@ -72,6 +72,54 @@
     </section>
   </aside>
 </div>
+
+<dialog class="share-dialog" id="shareDialog" aria-labelledby="shareHeading">
+  <div class="share-head">
+    <div>
+      <span class="share-eyebrow">COMPARTILHE UMA IDEIA</span>
+      <h2 id="shareHeading">Leve este post com você</h2>
+      <p>Preparamos um card vertical com o autor e o link da publicação.</p>
+    </div>
+    <button class="icon-btn share-close" id="shareClose" type="button" aria-label="Fechar">×</button>
+  </div>
+  <div class="share-content">
+    <div class="share-preview-wrap">
+      <article class="share-story" id="shareStoryPreview">
+        <header class="share-brand">
+          <span class="share-brand-mark">“</span>
+          <span>ACERVO<small>QUOTES &amp; ARTICLES</small></span>
+        </header>
+        <span class="share-category" id="shareCategory"></span>
+        <h3 id="shareTitle" hidden></h3>
+        <blockquote id="shareText"></blockquote>
+        <footer class="share-story-footer">
+          <span class="share-byline">UMA IDEIA DE <b id="shareAuthor"></b></span>
+          <span class="share-story-cta">CONTINUE NO ACERVO <small id="shareUrlLabel"></small></span>
+        </footer>
+      </article>
+    </div>
+    <div class="share-options">
+      <p class="share-options-title">Onde você quer compartilhar?</p>
+      <button class="share-option" type="button" data-share-target="x">
+        <span class="share-platform x-mark">X</span><span><b>Publicar no X</b><small>Post com o link da publicação</small></span><span class="share-arrow">↗</span>
+      </button>
+      <button class="share-option" type="button" data-share-target="wa-status" data-file-share disabled>
+        <span class="share-platform wa-mark">WA</span><span><b>Status do WhatsApp</b><small>Compartilhar o card vertical</small></span><span class="share-arrow">↗</span>
+      </button>
+      <button class="share-option" type="button" data-share-target="wa-message">
+        <span class="share-platform wa-mark">WA</span><span><b>Mensagem no WhatsApp</b><small>Enviar texto e link para alguém</small></span><span class="share-arrow">↗</span>
+      </button>
+      <button class="share-option" type="button" data-share-target="instagram" data-file-share disabled>
+        <span class="share-platform ig-mark">◎</span><span><b>Story do Instagram</b><small>Compartilhar o card vertical</small></span><span class="share-arrow">↗</span>
+      </button>
+      <button class="btn btn-ghost share-copy-link" id="shareCopyLink" type="button">Copiar link do post</button>
+      <p class="share-note">Status e Stories abrem o compartilhamento do aparelho. No Instagram, adicione o adesivo de link no app. Quem abrir o post precisará entrar ou criar uma conta.</p>
+      <p class="share-status" id="shareStatus" role="status" aria-live="polite"></p>
+      <a class="share-link" id="sharePermalink" href="#" target="_blank" rel="noopener noreferrer"></a>
+    </div>
+  </div>
+</dialog>
+
 <script src="../js/config.js"></script>
 <script src="../js/ui.js"></script>
 <script src="../js/auth.js"></script>
