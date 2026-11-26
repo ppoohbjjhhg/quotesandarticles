@@ -989,10 +989,18 @@
           posts = posts.map(x => x.id === u.id ? u : x);
           stopEdit(); render(); UI.toast('Alterações salvas');
         } else {
-          posts.unshift(await DB.add(body));
+          const createdPost = await DB.add(body);
+          posts.unshift(createdPost);
           if (reader) publicationCounts[uid] = (publicationCounts[uid] || 0) + 1;
           const badge = reader && POST_BADGES.find(b => b.min === publicationCounts[uid]);
-          clearForm(); render(); UI.toast(badge ? `Novo selo: ${badge.n}!` : 'Publicado para todos');
+          clearForm(); render();
+          try {
+            if (window.notifyPostCreated) await window.notifyPostCreated(createdPost);
+            UI.toast(badge ? `Novo selo: ${badge.n}!` : 'Publicado para todos');
+          } catch (error) {
+            console.error('A publicação foi salva, mas as notificações falharam.', error);
+            UI.toast('Publicado, mas não foi possível enviar as notificações.');
+          }
         }
       } catch { UI.toast('Não foi possível salvar. Confira se o SQL v5 foi executado e tente novamente.'); }
       finally { btn.textContent = editing ? 'Salvar alterações' : 'Publicar'; sync(); }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'acervo-pwa-v1';
+const CACHE_NAME = 'acervo-pwa-v3';
 const APP_SHELL = [
   '',
   'index.html',
@@ -16,6 +16,7 @@ const APP_SHELL = [
   'js/feed.js',
   'js/pwa.js',
   'img/login-bg.jpg',
+  'img/pwa-icon-180.png',
   'img/pwa-icon-192.png',
   'img/pwa-icon-512.png'
 ].map(path => new URL(path, self.registration.scope).href);
@@ -67,5 +68,34 @@ self.addEventListener('fetch', event => {
       if (cached) return cached;
       throw error;
     }
+  })());
+});
+
+self.addEventListener('push', event => {
+  const payload = event.data?.json() || {};
+  const url = new URL(payload.url || 'html/feed.html', self.registration.scope);
+  if (url.origin !== self.location.origin) return;
+  event.waitUntil(self.registration.showNotification(payload.title || 'Quotes and Articles', {
+    body: payload.body || 'Há uma nova publicação.',
+    icon: new URL('img/pwa-icon-192.png', self.registration.scope).href,
+    badge: new URL('img/pwa-icon-180.png', self.registration.scope).href,
+    data: { url: url.href },
+    tag: payload.tag || 'new-post'
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || 'html/feed.html', self.registration.scope);
+  if (url.origin !== self.location.origin) return;
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clients) {
+      if (new URL(client.url).origin === url.origin) {
+        await client.navigate(url.href);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(url.href);
   })());
 });
