@@ -83,7 +83,7 @@
     <div>
       <span class="share-eyebrow">COMPARTILHE UMA IDEIA</span>
       <h2 id="shareHeading">Leve este post com você</h2>
-      <p id="shareIntro">Preparamos um card com o autor e o link da publicação.</p>
+      <p id="shareIntro">Preparamos uma foto estilo polaroid para compartilhar.</p>
     </div>
     <button class="icon-btn share-close" id="shareClose" type="button" aria-label="Fechar">×</button>
   </div>
@@ -97,32 +97,28 @@
         <label>Fonte
           <select id="shareFont" class="share-select"><option value="editorial">Editorial</option><option value="modern">Moderna</option><option value="classic">Clássica</option><option value="mono">Mono</option></select>
         </label>
-        <label>Tema
-          <select id="shareTheme" class="share-select"><option value="liquid">Liquid glass</option><option value="midnight">Meia-noite</option><option value="aurora">Aurora</option><option value="sunset">Pôr do sol</option><option value="paper">Papel</option></select>
-        </label>
-        <label class="share-color-control">Fundo <input id="shareBackground" type="color" value="#10233f"></label>
-        <label class="share-color-control">Texto <input id="shareForeground" type="color" value="#f7faff"></label>
-        <label class="share-color-control">Destaque <input id="shareAccent" type="color" value="#9edcff"></label>
       </div>
     </div>
     <div class="share-preview-wrap">
       <article class="share-story" id="shareStoryPreview">
-        <header class="share-brand">
-          <span class="share-brand-mark">“</span>
-          <span>ACERVO<small>QUOTES &amp; ARTICLES</small></span>
-        </header>
-        <span class="share-category" id="shareCategory"></span>
-        <div class="share-media" id="shareMedia" hidden>
-          <img id="shareMediaImage" alt="">
+        <div class="share-polaroid">
+          <header class="share-brand">
+            <span class="share-brand-mark">“</span>
+            <span>ACERVO<small>QUOTES &amp; ARTICLES</small></span>
+          </header>
+          <div class="share-media" id="shareMedia" hidden>
+            <img id="shareMediaImage" alt="">
+          </div>
+          <span class="share-category" id="shareCategory"></span>
+          <div class="share-copy" id="shareCopy">
+            <h3 id="shareTitle" hidden></h3>
+            <blockquote id="shareText"></blockquote>
+          </div>
+          <footer class="share-story-footer">
+            <span class="share-byline"><small>por</small><b id="shareAuthor"></b></span>
+            <span class="share-story-cta">CONTINUE NO ACERVO <small id="shareUrlLabel"></small></span>
+          </footer>
         </div>
-        <div class="share-copy" id="shareCopy">
-          <h3 id="shareTitle" hidden></h3>
-          <blockquote id="shareText"></blockquote>
-        </div>
-        <footer class="share-story-footer">
-          <span class="share-byline"><small>por</small><b id="shareAuthor"></b></span>
-          <span class="share-story-cta">CONTINUE NO ACERVO <small id="shareUrlLabel"></small></span>
-        </footer>
       </article>
     </div>
     <div class="share-options">

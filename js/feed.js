@@ -181,13 +181,6 @@
     return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
   };
   const isGif = s => /^data:image\/gif/.test(s) || /\.gif(\?|$)/i.test(s);
-  const SHARE_THEMES = {
-    liquid: { bg: '#10233f', fg: '#f7faff', accent: '#9edcff' },
-    midnight: { bg: '#080d1b', fg: '#f6f7fb', accent: '#9c8cff' },
-    aurora: { bg: '#102c2b', fg: '#f0fff9', accent: '#83e8ca' },
-    sunset: { bg: '#3b1d32', fg: '#fff7f1', accent: '#ffbd82' },
-    paper: { bg: '#e9eef5', fg: '#17243a', accent: '#4169e1' }
-  };
   const SHARE_FONTS = {
     editorial: { css: "'Newsreader', Georgia, serif", canvas: 'Georgia, serif' },
     modern: { css: "'Sora', Arial, sans-serif", canvas: 'Arial, sans-serif' },
@@ -196,21 +189,27 @@
   };
   let sharingPost = null, sharingFile = null, sharingMedia = null, sharingUrl = '', shareGeneration = 0;
   let shareRecorder = null, shareAnimationFrame = 0;
+  let shareBackdropPromise = null;
+  function loadShareBackdrop() {
+    if (!shareBackdropPromise) {
+      shareBackdropPromise = new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Não foi possível carregar o fundo do Acervo.'));
+        image.src = new URL('../img/login-bg.jpg', location.href).href;
+      });
+    }
+    return shareBackdropPromise;
+  }
   const shareSettings = () => ({
     ratio: $('#shareRatio').value,
-    font: $('#shareFont').value,
-    bg: $('#shareBackground').value,
-    fg: $('#shareForeground').value,
-    accent: $('#shareAccent').value
+    font: $('#shareFont').value
   });
   function applyShareSettings() {
     const settings = shareSettings(), story = $('#shareStoryPreview');
     story.dataset.ratio = settings.ratio;
-    story.style.setProperty('--share-bg', settings.bg);
-    story.style.setProperty('--share-fg', settings.fg);
-    story.style.setProperty('--share-accent', settings.accent);
     story.style.setProperty('--share-font', SHARE_FONTS[settings.font].css);
-    story.classList.toggle('has-media', !!sharingMedia?.url);
+    story.classList.toggle('has-media', !!sharingMedia?.url && !sharingMedia?.error);
     story.classList.toggle('has-gif', !!sharingMedia?.gif);
     return settings;
   }
@@ -248,46 +247,38 @@
     lines.forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight));
     return y + lines.length * lineHeight;
   }
-  function measureShareCopy(ctx, p, settings, width, maxLines) {
-    let height = 0;
-    if (p.cat === 'artigo' && p.title) {
-      ctx.font = `700 42px ${SHARE_FONTS[settings.font].canvas}`;
-      height += wrappedLines(ctx, p.title, width, 2).length * 54 + 22;
-    }
-    ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${SHARE_FONTS[settings.font].canvas}`;
-    return height + wrappedLines(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', width, maxLines).length * 52;
-  }
   function roundedRect(ctx, x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
-  function glassPanel(ctx, x, y, w, h, r) {
-    roundedRect(ctx, x, y, w, h, r);
-    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.62)'; ctx.lineWidth = 2; ctx.stroke();
-    roundedRect(ctx, x + 3, y + 3, w - 6, Math.min(34, h - 6), Math.max(4, r - 3));
-    ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.fill();
-  }
-  function drawCover(ctx, image, x, y, w, h) {
-    ctx.save(); roundedRect(ctx, x, y, w, h, 28); ctx.clip();
+  function drawCover(ctx, image, x, y, w, h, radius = 4) {
+    ctx.save(); roundedRect(ctx, x, y, w, h, radius); ctx.clip();
     const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
     const dw = image.naturalWidth * scale, dh = image.naturalHeight * scale;
     ctx.drawImage(image, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
-    ctx.fillStyle = 'rgba(6,18,35,.14)'; ctx.fillRect(x, y, w, h);
     ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
-    roundedRect(ctx, x, y, w, h, 28); ctx.stroke();
   }
-  function drawShareCopy(ctx, p, settings, x, y, width, maxLines) {
+  function drawShareCopy(ctx, p, settings, x, y, width, maxLines, color = '#243047') {
     const font = SHARE_FONTS[settings.font].canvas;
     if (p.cat === 'artigo' && p.title) {
-      ctx.fillStyle = settings.fg; ctx.font = `700 42px ${font}`;
+      ctx.fillStyle = color; ctx.font = `700 42px ${font}`;
       y = drawWrapped(ctx, p.title, x, y, width, 54, 2) + 22;
     }
-    ctx.fillStyle = settings.fg;
+    ctx.fillStyle = color;
     ctx.font = `${p.cat === 'quote' ? 'italic ' : ''}38px ${font}`;
     return drawWrapped(ctx, p.text || p.title || 'Uma ideia para descobrir no Acervo.', x, y, width, 52, maxLines);
+  }
+  function drawShareBackdrop(ctx, image) {
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    const scale = Math.max((w + 100) / image.naturalWidth, (h + 100) / image.naturalHeight);
+    const dw = image.naturalWidth * scale, dh = image.naturalHeight * scale;
+    ctx.fillStyle = '#10233f'; ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.filter = 'blur(24px) brightness(.72)';
+    ctx.drawImage(image, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(10,27,51,.18)'; ctx.fillRect(0, 0, w, h);
   }
   async function loadShareMedia(url) {
     const response = await fetch(url);
@@ -317,58 +308,70 @@
     if (!ctx) throw new Error('Canvas indisponível');
     return { canvas, ctx };
   }
-  function drawShareCard(ctx, p, author, url, settings, mediaImage) {
+  function drawShareCard(ctx, p, author, url, settings, mediaImage, backdropImage) {
     const w = ctx.canvas.width, h = ctx.canvas.height;
     const vertical = settings.ratio === 'vertical';
-    const margin = vertical ? 80 : 90;
-    const bg = ctx.createLinearGradient(0, 0, w, h);
-    bg.addColorStop(0, settings.bg); bg.addColorStop(.55, settings.accent); bg.addColorStop(1, settings.bg);
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(w * .92, h * .12, vertical ? 330 : 460, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.beginPath(); ctx.arc(w * .12, h * .84, vertical ? 380 : 420, 0, Math.PI * 2); ctx.fill();
-    const brandY = vertical ? 130 : 115;
-    ctx.fillStyle = settings.fg; ctx.font = `italic ${vertical ? 72 : 64}px Georgia, serif`; ctx.fillText('“', margin, brandY + 22);
-    ctx.font = `700 ${vertical ? 31 : 29}px Arial, sans-serif`; ctx.fillText('ACERVO', margin + 70, brandY);
-    ctx.fillStyle = settings.fg; ctx.globalAlpha = .68; ctx.font = '600 17px Arial, sans-serif';
-    ctx.fillText('QUOTES & ARTICLES', margin + 72, brandY + 30); ctx.globalAlpha = 1;
-    ctx.fillStyle = settings.accent; ctx.font = `700 ${vertical ? 24 : 22}px Arial, sans-serif`;
-    ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), margin, vertical ? 270 : 220);
+    drawShareBackdrop(ctx, backdropImage);
+    const cardW = vertical ? 790 : 1450;
+    const cardH = vertical ? (mediaImage ? 1320 : 1280) : (mediaImage ? 820 : 680);
+    const cardX = (w - cardW) / 2, cardY = (h - cardH) / 2;
+    const pad = vertical ? 38 : 42;
+    const photoH = 760;
+    const photoY = cardY + pad;
+    let innerX = cardX + pad;
+    let innerW = cardW - pad * 2;
 
-    if (vertical) {
-      const mediaY = 330, mediaH = 610, panelY = mediaImage ? 980 : 380;
-      if (mediaImage) drawCover(ctx, mediaImage, margin, mediaY, w - margin * 2, mediaH);
-      const copyX = margin + 42, copyY = panelY + 64, copyWidth = w - margin * 2 - 84;
-      const maxLines = mediaImage ? 5 : 12;
-      const panelH = mediaImage
-        ? 470
-        : Math.max(190, measureShareCopy(ctx, p, settings, copyWidth, maxLines) + 108);
-      glassPanel(ctx, margin, panelY, w - margin * 2, panelH, 30);
-      drawShareCopy(ctx, p, settings, copyX, copyY, copyWidth, maxLines);
-      const footerY = panelY + panelH + 42;
-      ctx.fillStyle = settings.fg; ctx.globalAlpha = .56; ctx.font = '16px Arial, sans-serif';
-      ctx.fillText(`por ${excerpt(author.display_name, 32)}`, margin + 40, footerY); ctx.globalAlpha = 1;
-      ctx.fillStyle = settings.accent; ctx.font = '700 18px Arial, sans-serif'; ctx.fillText('CONTINUE NO ACERVO', margin + 40, footerY + 38);
-      ctx.fillStyle = settings.fg; ctx.globalAlpha = .72; ctx.font = '16px Arial, sans-serif';
-      drawWrapped(ctx, url, margin + 40, footerY + 70, w - margin * 2 - 80, 24, 2); ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(-.025);
+    ctx.shadowColor = 'rgba(3,10,20,.42)';
+    ctx.shadowBlur = 44;
+    ctx.shadowOffsetY = 28;
+    ctx.fillStyle = '#fff';
+    roundedRect(ctx, -cardW / 2, -cardH / 2, cardW, cardH, 8);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.translate(-w / 2, -h / 2);
+
+    let copyY = cardY + pad;
+    if (mediaImage) {
+      if (vertical) {
+        drawCover(ctx, mediaImage, innerX, photoY, innerW, photoH);
+        copyY = photoY + photoH + 54;
+      } else {
+        const photoW = 690, photoH = cardH - pad * 2;
+        drawCover(ctx, mediaImage, innerX, photoY, photoW, photoH);
+        innerX += photoW + 44;
+        innerW = cardX + cardW - pad - innerX;
+        copyY = cardY + pad + 20;
+      }
     } else {
-      const mediaX = margin, mediaY = 280, mediaW = 790, panelX = mediaImage ? 930 : margin;
-      const panelW = mediaImage ? w - panelX - margin : w - margin * 2;
-      if (mediaImage) drawCover(ctx, mediaImage, mediaX, mediaY, mediaW, 550);
-      const copyX = panelX + 42, copyY = mediaY + 70, copyWidth = panelW - 84, maxLines = mediaImage ? 6 : 7;
-      const panelH = mediaImage ? 550 : Math.max(240, measureShareCopy(ctx, p, settings, copyWidth, maxLines) + 112);
-      glassPanel(ctx, panelX, mediaY, panelW, panelH, 30);
-      drawShareCopy(ctx, p, settings, copyX, copyY, copyWidth, maxLines);
-      const footerY = mediaY + panelH + 38;
-      ctx.fillStyle = settings.fg; ctx.globalAlpha = .56; ctx.font = '15px Arial, sans-serif';
-      ctx.fillText(`por ${excerpt(author.display_name, 32)}`, margin + 34, footerY); ctx.globalAlpha = 1;
-      ctx.fillStyle = settings.accent; ctx.font = '700 18px Arial, sans-serif'; ctx.fillText('CONTINUE NO ACERVO', margin + 34, footerY + 34);
-      ctx.fillStyle = settings.fg; ctx.globalAlpha = .72; ctx.font = '16px Arial, sans-serif';
-      drawWrapped(ctx, url, margin + 34, footerY + 64, w - margin * 2 - 68, 24, 2); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#68758a';
+      ctx.font = '700 22px Arial, sans-serif';
+      ctx.fillText('ACERVO  ·  QUOTES & ARTICLES', innerX, copyY + 22);
+      copyY += vertical ? 92 : 72;
     }
+
+    ctx.fillStyle = '#68758a';
+    ctx.font = '700 20px Arial, sans-serif';
+    ctx.fillText((CATS[p.cat] || CATS.nota).l.toUpperCase(), innerX, copyY);
+    copyY += vertical ? 42 : 36;
+    const copyEnd = drawShareCopy(ctx, p, settings, innerX, copyY, innerW, mediaImage ? (vertical ? 4 : 3) : (vertical ? 10 : 4));
+    const footerY = mediaImage
+      ? (vertical ? cardY + cardH - 78 : cardY + cardH - pad - 14)
+      : Math.max(copyEnd + 42, cardY + cardH - 120);
+    ctx.fillStyle = '#68758a';
+    ctx.font = '600 20px Arial, sans-serif';
+    ctx.fillText(`por ${excerpt(author.display_name, 32)}`, innerX, footerY);
+    if (!mediaImage) {
+      ctx.font = '16px Arial, sans-serif';
+      drawWrapped(ctx, url, innerX, footerY + 32, innerW, 22, 2);
+    }
+    ctx.restore();
   }
   async function makeShareImage(p, author, url, settings, mediaImage) {
     const { canvas, ctx } = createShareCanvas(settings);
-    drawShareCard(ctx, p, author, url, settings, mediaImage);
+    drawShareCard(ctx, p, author, url, settings, mediaImage, await loadShareBackdrop());
     const blob = await new Promise((resolve, reject) => canvas.toBlob(
       value => value ? resolve(value) : reject(new Error('Não foi possível criar o card')),
       'image/png'
@@ -393,6 +396,7 @@
     }
     const format = getShareVideoType();
     if (!format) throw new Error('Este navegador não oferece um formato de vídeo compatível para compartilhar o GIF animado.');
+    const backdropImage = await loadShareBackdrop();
     const { canvas, ctx } = createShareCanvas(settings);
     const stream = canvas.captureStream(24);
     let recorder;
@@ -402,7 +406,7 @@
       stream.getTracks().forEach(track => track.stop());
       throw error;
     }
-    drawShareCard(ctx, p, author, url, settings, mediaImage);
+    drawShareCard(ctx, p, author, url, settings, mediaImage, backdropImage);
     shareRecorder = recorder;
     return new Promise((resolve, reject) => {
       const chunks = [];
@@ -445,7 +449,7 @@
       const startedAt = performance.now();
       const drawFrame = now => {
         if (recorder.state !== 'recording') return;
-        drawShareCard(ctx, p, author, url, settings, mediaImage);
+        drawShareCard(ctx, p, author, url, settings, mediaImage, backdropImage);
         if (now - startedAt >= 5000) recorder.stop();
         else shareAnimationFrame = requestAnimationFrame(drawFrame);
       };
@@ -527,8 +531,8 @@
     $('#sharePermalink').textContent = sharingUrl;
     $('#shareMedia').hidden = !mediaUrl;
     $('#shareIntro').textContent = gif
-      ? 'O GIF será integrado ao card e exportado como vídeo animado. Personalize o formato, a fonte e as cores.'
-      : 'Ajuste o formato, a fonte e as cores para criar seu card Liquid Glass.';
+      ? 'O GIF será integrado à foto estilo polaroid e exportado como vídeo animado.'
+      : 'A foto do login fica ao fundo, com a publicação em um card simples por cima.';
     $('#shareDownload').textContent = gif ? 'Baixar card animado' : 'Baixar card personalizado';
     $('#shareDownload').disabled = true;
     document.querySelectorAll('[data-file-share] small').forEach(label => {
@@ -546,15 +550,19 @@
     if (!mediaUrl) { await refreshShareDesign(); return; }
     $('#shareStatus').textContent = 'Carregando a mídia do post…';
     try { sharingMedia = await loadShareMedia(mediaUrl); }
-    catch { sharingMedia = { url: mediaUrl, gif, loading: false, error: true, file: null, image: null }; }
+    catch {
+      sharingMedia = { url: mediaUrl, gif, loading: false, error: true, file: null, image: null };
+      image.removeAttribute('src'); image.alt = '';
+      $('#shareMedia').hidden = true;
+    }
     if (sharingPost === p) {
       if (sharingMedia.gif && sharingMedia.objectUrl) {
         image.src = sharingMedia.objectUrl;
         sharingMedia.image = image;
       }
       $('#shareIntro').textContent = sharingMedia.gif
-        ? 'O GIF será integrado ao card e exportado como vídeo animado. Personalize o formato, a fonte e as cores.'
-        : 'A imagem do post será integrada ao card Liquid Glass.';
+        ? 'O GIF será integrado à foto estilo polaroid e exportado como vídeo animado.'
+        : 'A imagem do post aparece em uma foto estilo polaroid sobre o fundo do login.';
       document.querySelectorAll('[data-file-share] small').forEach(label => {
         label.textContent = sharingMedia.gif ? 'Compartilhar card com GIF animado' : 'Compartilhar o card personalizado';
       });
@@ -595,18 +603,7 @@
     downloadShareFile();
     $('#shareStatus').textContent = 'Arquivo baixado. Publique-o no aplicativo e use “Copiar link do post” para compartilhar o endereço.';
   }
-  $('#shareTheme').addEventListener('change', () => {
-    const theme = SHARE_THEMES[$('#shareTheme').value];
-    $('#shareBackground').value = theme.bg;
-    $('#shareForeground').value = theme.fg;
-    $('#shareAccent').value = theme.accent;
-    refreshShareDesign();
-  });
   ['shareRatio', 'shareFont'].forEach(id => $(`#${id}`).addEventListener('change', refreshShareDesign));
-  ['shareBackground', 'shareForeground', 'shareAccent'].forEach(id => {
-    $(`#${id}`).addEventListener('input', applyShareSettings);
-    $(`#${id}`).addEventListener('change', refreshShareDesign);
-  });
   $('#shareDownload').addEventListener('click', () => {
     downloadShareFile();
     $('#shareStatus').textContent = sharingFile?.type.startsWith('video/')
