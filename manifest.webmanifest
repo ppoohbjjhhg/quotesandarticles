@@ -1,0 +1,27 @@
+{
+  "id": "./html/login.html",
+  "name": "Acervo — Quotes & Articles",
+  "short_name": "Acervo",
+  "description": "Seu espaço para publicar e descobrir quotes, notas, estudos e artigos.",
+  "start_url": "./html/login.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0A1B33",
+  "theme_color": "#0A1B33",
+  "categories": ["education", "books", "social"],
+  "icons": [
+    {
+      "src": "./img/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./img/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
